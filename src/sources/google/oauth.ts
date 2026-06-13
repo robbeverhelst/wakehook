@@ -26,7 +26,9 @@ export function buildAuthUrl(cfg: GoogleHealthConfig, state: string): string {
     response_type: "code",
     access_type: "offline",
     prompt: "consent",
-    include_granted_scopes: "true",
+    // NOTE: do NOT set include_granted_scopes — for the new Google Health API it
+    // produces a malformed (HTTP 400) request when the account already holds
+    // legacy googlehealth/fitness grants (mixed-scope token). Request only ours.
     scope: cfg.scopes.join(" "),
     state,
   });
