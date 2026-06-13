@@ -98,9 +98,22 @@ curl -X POST http://localhost:8080/test/replay \
 
 ## Extending
 
-- **New source** (Fitbit Web API, Health Connect, Open Wearables): implement the `Source`
-  interface in `src/types.ts`.
-- **New subscriber shape**: add a `preset` branch in `src/subscribers/fanout.ts`.
+Google Health is just the first `Source`. The core (inference, dedup, fan-out) is
+provider-agnostic, so adding a provider touches **no core code**:
+
+1. Implement the `Source` interface (`src/types.ts`) under `src/sources/<name>/`.
+   A source declares one or both **capabilities**:
+   - `webhook` (push) — the provider POSTs to `/webhook`
+     (Google Health, Fitbit Web, WHOOP, Withings, Oura, Sleep as Android…).
+   - `poll` (pull) — wakehook polls it on a timer
+     (on-device Health Connect bridge, Open Wearables, plain REST APIs…).
+2. Register it with one line in `src/sources/registry.ts`.
+3. Select it via `"source": "<name>"` in config.
+
+The server mounts `/webhook` only for push sources; the scheduler drives poll sources.
+No new providers ship today, but the interface is ready for both kinds.
+
+**New subscriber shape**: add a `preset` branch in `src/subscribers/fanout.ts`.
 
 ## Status
 

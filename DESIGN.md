@@ -64,8 +64,12 @@ an instant sync; background sync is ~15 min. Documented as a setup note, not sol
  + HealthConnectSource (later)                                                   └─ OpenClaw preset
 ```
 
-- **Source interface** — verify handshake, parse provider webhook, fetch session, yield a
-  normalized `SleepSession`. v1 implements `GoogleHealthSource`.
+- **Source interface** — yields normalized `SleepSession`s via one or both **capabilities**:
+  `webhook` (push: handshake + parse notification + fetch) and `poll` (pull: timed `run()`).
+  A config-driven **registry** (`src/sources/registry.ts`) selects the active source by name;
+  adding a provider is a one-line registration + a file, with no core changes. v1 ships
+  `GoogleHealthSource` (webhook). The server mounts `/webhook` only for push sources; a
+  scheduler drives poll sources.
 - **Core** — stateless inference + stateful dedup. Provider-agnostic.
 - **Subscribers** — a configured list of consumer endpoints. The core **fans the `WakeEvent`
   out to all of them**, each independently signed and retried. A subscriber is `{ url, secret,

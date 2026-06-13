@@ -52,16 +52,34 @@ export interface Subscriber {
 }
 
 /**
- * A Source adapter: bridges one provider's webhook + API to normalized sessions.
- * v1 ships GoogleHealthSource; FitbitWeb / HealthConnect slot in here later.
+ * A Source adapter bridges one provider to normalized SleepSessions. Providers
+ * deliver data in one of two ways, modeled as optional capabilities — a source
+ * implements whichever fit (and may implement both):
+ *
+ *   - `webhook` (push): the provider POSTs notifications to /webhook.
+ *       e.g. Google Health, Fitbit Web, WHOOP, Withings, Oura, Sleep as Android.
+ *   - `poll`   (pull): we periodically ask the provider for recent sessions.
+ *       e.g. an on-device Health Connect bridge, Open Wearables, plain REST APIs.
+ *
+ * The core (inference, dedup, fan-out) is identical regardless of how sessions
+ * arrive. Adding a provider = implement this interface in src/sources/<name>/
+ * and register it in src/sources/registry.ts. No core changes.
  */
 export interface Source {
   /** Stable provider id placed into WakeEvent.source. */
   readonly name: string;
+  /** Present if this provider pushes notifications to an inbound webhook. */
+  readonly webhook?: WebhookCapability;
+  /** Present if this provider is polled for recent sessions. */
+  readonly poll?: PollCapability;
+}
+
+/** Inbound-webhook capability (push providers). */
+export interface WebhookCapability {
   /**
    * Handle the provider's endpoint-ownership verification challenge.
-   * Return a Response if this request was a challenge (the server returns it
-   * verbatim); return null if it's an ordinary notification to be parsed.
+   * Return a Response to send verbatim if this request was a challenge;
+   * return null if it's an ordinary notification to be parsed.
    */
   handleChallenge(req: Request): Promise<Response | null>;
   /**
@@ -69,4 +87,12 @@ export interface Source {
    * full detail from the provider API as needed. May return [] (nothing relevant).
    */
   sessionsFromNotification(req: Request, rawBody: string): Promise<SleepSession[]>;
+}
+
+/** Polling capability (pull providers). */
+export interface PollCapability {
+  /** How often to poll, in milliseconds. */
+  readonly intervalMs: number;
+  /** Fetch recent sessions. May return [] when nothing new. */
+  run(): Promise<SleepSession[]>;
 }
