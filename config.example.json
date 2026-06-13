@@ -1,0 +1,32 @@
+{
+  "port": 8080,
+  "dbPath": "./wake.sqlite",
+  "inference": {
+    "timezone": "Europe/Brussels",
+    "windowStart": "04:00",
+    "windowEnd": "11:00",
+    "minDurationMin": 180,
+    "supersedeGapMin": 45
+  },
+  "google": {
+    "clientId": "REPLACE_OR_USE_ENV",
+    "clientSecret": "REPLACE_OR_USE_ENV",
+    "redirectUri": "http://localhost:8080/oauth/callback",
+    "webhookAuthToken": "a-long-random-string-google-must-present",
+    "scopes": ["https://www.googleapis.com/auth/googlehealth.sleep.readonly"]
+  },
+  "subscribers": [
+    {
+      "id": "openclaw",
+      "url": "http://localhost:3000/hooks/wake",
+      "secret": "your-openclaw-hook-token",
+      "preset": "openclaw"
+    },
+    {
+      "id": "example-generic",
+      "url": "https://example.com/awake",
+      "secret": "per-subscriber-hmac-secret",
+      "preset": "generic"
+    }
+  ]
+}

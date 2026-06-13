@@ -1,0 +1,22 @@
+{
+  "name": "wakehook",
+  "version": "0.1.0",
+  "description": "Vendor-neutral wake-detection webhook bus: turns Google Health sleep data into a signed user.awake event broadcast to any subscriber.",
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "auth": "bun src/cli/auth.ts",
+    "subscribe": "bun src/cli/subscribe.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  }
+}
