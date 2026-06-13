@@ -1,6 +1,7 @@
 {
   "port": 8080,
   "dbPath": "./wake.sqlite",
+  "source": "google-health",
   "inference": {
     "timezone": "Europe/Brussels",
     "windowStart": "04:00",

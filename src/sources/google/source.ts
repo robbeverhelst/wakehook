@@ -18,7 +18,7 @@
  */
 import type { GoogleHealthConfig } from "../../config.ts";
 import type { Store } from "../../db.ts";
-import type { SleepSession, Source } from "../../types.ts";
+import type { SleepSession, Source, WebhookCapability } from "../../types.ts";
 import { getValidAccessToken } from "./oauth.ts";
 
 const API_BASE = "https://health.googleapis.com/v1";
@@ -33,13 +33,19 @@ interface Notification {
 export class GoogleHealthSource implements Source {
   readonly name = "google-health";
 
+  /** Google Health is a push provider — it delivers via the inbound webhook. */
+  readonly webhook: WebhookCapability = {
+    handleChallenge: (req) => this.handleChallenge(req),
+    sessionsFromNotification: (req, body) => this.sessionsFromNotification(req, body),
+  };
+
   constructor(
     private cfg: GoogleHealthConfig,
     private store: Store,
     private now: () => number = Date.now,
   ) {}
 
-  async handleChallenge(req: Request): Promise<Response | null> {
+  private async handleChallenge(req: Request): Promise<Response | null> {
     // Some webhook setups send an echo challenge (query or body). Echo it back.
     const url = new URL(req.url);
     const q = url.searchParams.get("challenge") ?? url.searchParams.get("hub.challenge");
@@ -47,7 +53,7 @@ export class GoogleHealthSource implements Source {
     return null;
   }
 
-  async sessionsFromNotification(_req: Request, rawBody: string): Promise<SleepSession[]> {
+  private async sessionsFromNotification(_req: Request, rawBody: string): Promise<SleepSession[]> {
     let note: Notification;
     try {
       note = JSON.parse(rawBody) as Notification;

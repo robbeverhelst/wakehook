@@ -32,6 +32,8 @@ export interface GoogleHealthConfig {
 export interface Config {
   port: number;
   dbPath: string;
+  /** Which registered Source to run (see src/sources/registry.ts). */
+  source: string;
   inference: InferenceConfig;
   google: GoogleHealthConfig;
   subscribers: Subscriber[];
@@ -78,6 +80,7 @@ export function loadConfig(): Config {
   return {
     port: Number(env("PORT", String(file.port ?? DEFAULTS.port))),
     dbPath: env("DB_PATH", file.dbPath ?? DEFAULTS.dbPath),
+    source: env("SOURCE", file.source ?? "google-health"),
     inference: { ...DEFAULTS.inference, ...(file.inference ?? {}) },
     google,
     subscribers: file.subscribers ?? [],
