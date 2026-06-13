@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="docs/architecture.svg" alt="wakehook — health APIs flow into wakehook, which infers the wake moment and fans a signed user.awake event out to OpenClaw, Home Assistant, or any URL" width="100%">
-
 # ⏰ wakehook
 
 **A webhook that fires when you wake up.**
 
 Plug in your sleep data, get a clean `user.awake` event — then make your morning *do something*.
+
+<img src="docs/architecture.svg" alt="wakehook — health APIs flow into wakehook, which infers the wake moment and fans a signed user.awake event out to OpenClaw, Home Assistant, or any URL" width="100%">
 
 <br>
 
