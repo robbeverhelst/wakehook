@@ -115,6 +115,22 @@ Then expose `/webhook` publicly — Cloudflare Tunnel, reverse proxy, VPS, your 
 bakes in **no ingress assumptions** — and create a Google Health **sleep** webhook subscription
 pointing at it.
 
+### 🔌 No public URL? Poll instead
+
+Don't want to expose anything? Run the Google Health source in **poll** mode — it pulls recent
+sleep from the API on a timer, so all traffic is **outbound** (no inbound URL, no tunnel). Same
+inference and once-per-morning dedup; you just fire on the next tick instead of instantly.
+
+```jsonc
+// config.json → "google"
+"mode": "poll",            // "webhook" (default) | "poll" | "both"
+"pollIntervalMs": 900000,  // every 15 min
+"pollLookbackMin": 720     // scan the last 12h of sleep each tick
+```
+
+Poll still needs the OAuth creds + `bun run auth` (you're calling Google's API) — it only drops
+the *ingress* requirement. `"both"` keeps the webhook as primary with poll as a safety net.
+
 ### 🧪 Test it without waiting for morning
 
 ```bash
@@ -145,8 +161,9 @@ provider-agnostic, so a new provider touches **no core code**:
 2. Register it with **one line** in `src/sources/registry.ts`.
 3. Select it via `"source": "<name>"` in config.
 
-The server mounts `/webhook` only for push sources; the scheduler drives poll sources. No new
-providers ship today — but the interface is ready for both kinds.
+The server mounts `/webhook` only for push sources; the scheduler drives poll sources. Google
+Health implements **both** (selectable via `google.mode`) — proof the interface carries either
+kind with no core changes.
 
 ➕ **New subscriber shape?** Add a `preset` branch in `src/subscribers/fanout.ts`.
 

@@ -20,7 +20,17 @@ function cfg(): Config {
       minDurationMin: 180,
       supersedeGapMin: 45,
     },
-    google: { clientId: "", clientSecret: "", redirectUri: "", webhookAuthToken: "", scopes: [] },
+    google: {
+      clientId: "",
+      clientSecret: "",
+      redirectUri: "",
+      webhookAuthToken: "",
+      scopes: [],
+      apiBase: "https://health.googleapis.com/v1",
+      mode: "webhook",
+      pollIntervalMs: 900_000,
+      pollLookbackMin: 720,
+    },
     subscribers: [], // fan-out is exercised in fanout.test.ts; here we assert firing
   };
 }

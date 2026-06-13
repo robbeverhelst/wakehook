@@ -19,6 +19,8 @@ export interface InferenceConfig {
   supersedeGapMin: number;
 }
 
+export type GoogleMode = "webhook" | "poll" | "both";
+
 export interface GoogleHealthConfig {
   clientId: string;
   clientSecret: string;
@@ -27,6 +29,19 @@ export interface GoogleHealthConfig {
   /** Shared token the provider must present on webhook calls (Authorization). */
   webhookAuthToken: string;
   scopes: string[];
+  /** Base URL of the Google Health REST API. Overridable for local testing. */
+  apiBase: string;
+  /**
+   * How sleep data is ingested:
+   *  - "webhook" — Google pushes to /webhook (needs a public HTTPS URL).
+   *  - "poll"    — we pull from the API on a timer (no inbound URL; all outbound).
+   *  - "both"    — push primary, poll as a safety net.
+   */
+  mode: GoogleMode;
+  /** Poll cadence in ms (when mode includes poll). */
+  pollIntervalMs: number;
+  /** How far back each poll scans for recent sleep, in minutes. */
+  pollLookbackMin: number;
 }
 
 export interface Config {
@@ -55,6 +70,10 @@ function env(name: string, fallback = ""): string {
   return process.env[name] ?? fallback;
 }
 
+function normalizeMode(v: string): GoogleMode {
+  return v === "poll" || v === "both" || v === "webhook" ? v : "webhook";
+}
+
 export function loadConfig(): Config {
   const path = env("CONFIG_PATH", "./config.json");
   const file: Partial<Config> = existsSync(path)
@@ -75,6 +94,17 @@ export function loadConfig(): Config {
     scopes: file.google?.scopes ?? [
       "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
     ],
+    apiBase: env(
+      "GOOGLE_HEALTH_API_BASE",
+      file.google?.apiBase ?? "https://health.googleapis.com/v4",
+    ),
+    mode: normalizeMode(env("GOOGLE_MODE", file.google?.mode ?? "webhook")),
+    pollIntervalMs: Number(
+      env("GOOGLE_POLL_INTERVAL_MS", String(file.google?.pollIntervalMs ?? 900_000)),
+    ),
+    pollLookbackMin: Number(
+      env("GOOGLE_POLL_LOOKBACK_MIN", String(file.google?.pollLookbackMin ?? 720)),
+    ),
   };
 
   return {
