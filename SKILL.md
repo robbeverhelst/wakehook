@@ -1,15 +1,16 @@
 ---
 name: wakehook
-description: Install, configure, authorize and run wakehook so OpenClaw runs the user's morning routine when they wake up. wakehook turns Google Health / Fitbit sleep data into a signed event and POSTs OpenClaw's /hooks/wake a one-line nudge each morning. Use when the user wants wake-triggered automations, mentions wakehook, or asks to "do something when I wake up".
+description: Install, configure, authorize and run wakehook so OpenClaw runs the user's morning routine when they wake up. wakehook turns Google Health / Fitbit sleep data into a neutral user.awake event and POSTs it to an OpenClaw mapped hook, which turns it into a wake action. Use when the user wants wake-triggered automations, mentions wakehook, or asks to "do something when I wake up".
 homepage: https://github.com/robbeverhelst/wakehook
 ---
 
 # wakehook → OpenClaw
 
 `wakehook` is a tiny self-hosted service that watches the user's sleep data
-(Google Health / Fitbit), detects the moment they **woke up**, and POSTs
-OpenClaw's `/hooks/wake` a one-line nudge so the morning routine runs itself —
-at most once per morning.
+(Google Health / Fitbit), detects the moment they **woke up**, and POSTs OpenClaw
+a neutral `user.awake` event so the morning routine runs itself — at most once
+per morning. OpenClaw maps that event into a wake action (its native pattern), so
+wakehook stays vendor-neutral.
 
 Work through the steps in order. **Ask the user** at the decision points instead
 of assuming. Do not improvise from the README — these steps are verified.
@@ -24,27 +25,39 @@ of assuming. Do not improvise from the README — these steps are verified.
    user-consented OAuth. Ask the user for the id + secret (reuse their existing
    Google project if they have one).
 
-## Step 1 — enable OpenClaw's inbound webhook
+## Step 1 — add an OpenClaw mapped hook
 
-wakehook delivers by POSTing OpenClaw's gateway `/hooks/wake`. Make sure the
-gateway has hooks enabled (OpenClaw gateway config):
+wakehook POSTs the raw `user.awake` event to an OpenClaw **mapped hook**; OpenClaw
+turns it into a wake of the main session via `hooks.mappings`. In the OpenClaw
+gateway config:
 
-```jsonc
+```json5
 {
-  "hooks": {
-    "enabled": true,
-    "path": "/hooks",          // must not be "/"
-    "token": "<HOOKS_TOKEN>"   // any strong random string
-  }
+  hooks: {
+    enabled: true,
+    path: "/hooks",            // must not be "/"
+    token: "<HOOKS_TOKEN>",    // any strong random string
+    mappings: [
+      {
+        match: { path: "wakehook" },   // matches POST /hooks/wakehook
+        action: "wake",
+        wakeMode: "now",
+        name: "wakehook",
+        // reads fields straight from wakehook's user.awake event:
+        messageTemplate: "You woke at {{wokeAt}} (slept {{session.durationMin}} min).",
+      },
+    ],
+  },
 }
 ```
 
-Note OpenClaw's gateway address (host + port — the docs' examples use
+Note the gateway address (host + port — OpenClaw's docs examples use
 `127.0.0.1:18789`; confirm the user's actual port). The delivery URL is then
-`http://<gateway-host>:<port>/hooks/wake`, and `<HOOKS_TOKEN>` is the secret
-wakehook must present. (Verified contract: `/hooks/wake` accepts
-`{ "text": "...", "mode": "now" }` with `Authorization: Bearer <token>` or
-`x-openclaw-token: <token>`; query-string tokens are rejected.)
+`http://<gateway-host>:<port>/hooks/wakehook`, and `<HOOKS_TOKEN>` is the token
+wakehook must present. (Verified: `/hooks/*` is gated by the token in a header —
+`Authorization: Bearer <token>` or `x-openclaw-token: <token>`; query-string
+tokens are rejected. The mapping then renders `messageTemplate` and wakes the
+session.)
 
 ## Step 2 — choose how wakehook gets the sleep data (ask the user)
 
@@ -64,8 +77,8 @@ If the user has no preference, use **poll**.
 ## Step 3 — configure wakehook
 
 Create **`config.json`** in the working directory. Set `timezone` to the user's
-IANA zone, the subscriber `url` to OpenClaw's `/hooks/wake`, and the subscriber
-`secret` to OpenClaw's `<HOOKS_TOKEN>` from Step 1:
+IANA zone, the subscriber `url` to the mapped hook from Step 1, and pass the
+`<HOOKS_TOKEN>` as the `Authorization` header:
 
 ```json
 {
@@ -80,11 +93,19 @@ IANA zone, the subscriber `url` to OpenClaw's `/hooks/wake`, and the subscriber
   },
   "google": { "mode": "poll", "pollIntervalMs": 900000, "pollLookbackMin": 720 },
   "subscribers": [
-    { "id": "openclaw", "url": "http://<gateway-host>:<port>/hooks/wake", "secret": "<HOOKS_TOKEN>", "preset": "openclaw" }
+    {
+      "id": "openclaw",
+      "url": "http://<gateway-host>:<port>/hooks/wakehook",
+      "headers": { "Authorization": "Bearer <HOOKS_TOKEN>" }
+    }
   ]
 }
 ```
 
+> No `preset` needed — `generic` (the raw signed event) is the default and is what
+> the OpenClaw mapping expects. `<HOOKS_TOKEN>` must equal the gateway's
+> `hooks.token` from Step 1.
+>
 > If the user chose **webhook** mode instead: set `"google"` to
 > `{ "mode": "webhook", "webhookAuthToken": "<random>" }`, also put
 > `GOOGLE_WEBHOOK_AUTH_TOKEN` in `.env`, expose wakehook's `/webhook` over public
@@ -123,18 +144,22 @@ every `pollIntervalMs` and, on the morning wake, POSTs OpenClaw once.
 
 ## What OpenClaw receives
 
+wakehook POSTs the raw, neutral event (the OpenClaw mapping templates it):
+
 ```
-POST http://<gateway-host>:<port>/hooks/wake
+POST http://<gateway-host>:<port>/hooks/wakehook
 Authorization: Bearer <HOOKS_TOKEN>
 Content-Type: application/json
 
-{ "text": "You woke at 07:13 (slept 7h44m).", "mode": "now" }
+{ "event": "user.awake", "wokeAt": "2026-06-13T08:04:00Z", "user": "self",
+  "source": "google-health",
+  "session": { "start": "...", "end": "2026-06-13T08:04:00Z", "durationMin": 464 } }
 ```
 
-OpenClaw turns this into a `now` wake of the main session — handle it as the
-trigger to run the morning routine. wakehook also sends `X-Wake-Signature`
-(HMAC of the body with the secret) and `X-Wake-Event-Id` if you want extra
-verification. Fires at most once per morning.
+The Step-1 mapping turns this into a `now` wake of the main session with the
+templated text — handle that as the trigger to run the morning routine. wakehook
+also sends `X-Wake-Event-Id` (and `X-Wake-Signature` if a `secret` is set) for
+optional extra verification. Fires at most once per morning.
 
 ## Verify without waiting for morning
 
@@ -144,17 +169,18 @@ curl -X POST http://localhost:8080/test/replay \
 ```
 
 Injects a synthetic wake "now" and delivers it exactly like a real one — confirm
-OpenClaw receives and acts on it.
+OpenClaw maps it and runs the routine.
 
 ## Gotchas
 
 - **Bun-only** — never run with Node.
-- The subscriber `secret` MUST equal OpenClaw's gateway `hooks.token`, or
-  `/hooks/wake` rejects it (401). Hooks must be **enabled** on the gateway.
+- The `Authorization` bearer MUST equal OpenClaw's gateway `hooks.token`, or
+  `/hooks/wakehook` rejects it (401). Hooks must be **enabled** and the
+  **mapping** (`match.path: "wakehook"`) must exist, or the path won't route.
 - **poll** needs the OAuth creds but **no inbound URL**; **webhook** is instant
   but unverified — prefer poll unless the user asks otherwise.
 - A Google **API key is not enough** — it needs the OAuth client + `wakehook-auth`.
-- If `/hooks/wake` returns 200 but nothing happens, check the OpenClaw version
-  (a known issue affected some 2026.3.x builds) or try `mode: "now"` is set.
+- If the hook returns 200 but nothing happens, check the OpenClaw version (a known
+  issue affected some 2026.3.x builds) and that the mapping `action: "wake"` is set.
 
 Source + full docs: https://github.com/robbeverhelst/wakehook
