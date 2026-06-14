@@ -1,3 +1,16 @@
+# [1.0.0](https://github.com/robbeverhelst/wakehook/compare/v0.2.0...v1.0.0) (2026-06-14)
+
+
+* feat(subscribers)!: per-subscriber headers; drop the openclaw preset ([87ad604](https://github.com/robbeverhelst/wakehook/commit/87ad6047ff988553f97285d15d80a8507242d037))
+
+
+### BREAKING CHANGES
+
+* the `openclaw` preset is removed — use `generic` (default) with
+`headers` and an OpenClaw hooks.mappings entry.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
 # [0.2.0](https://github.com/robbeverhelst/wakehook/compare/v0.1.0...v0.2.0) (2026-06-14)
 
 
