@@ -39,16 +39,23 @@ export interface WakeEvent {
 export interface Subscriber {
   /** Friendly id, also used in delivery state + logs. */
   id: string;
-  /** Destination URL the signed event is POSTed to. */
+  /** Destination URL the WakeEvent is POSTed to. */
   url: string;
-  /** Per-subscriber HMAC secret; consumers verify X-Wake-Signature with it. */
-  secret: string;
+  /** Optional HMAC secret; when set, the body is signed as `X-Wake-Signature`. */
+  secret?: string;
   /**
-   * How to shape the outgoing request:
-   *  - "generic"  → POST the raw signed WakeEvent (vendor-neutral contract).
-   *  - "openclaw" → translate to OpenClaw's /hooks/wake { text, mode }.
+   * Extra HTTP headers sent with every delivery — used to satisfy the receiver's
+   * own auth. For OpenClaw, point `url` at a mapped hook and set
+   * `{ "Authorization": "Bearer <hooks.token>" }`; OpenClaw turns the raw event
+   * into a wake/agent action via `hooks.mappings`.
    */
-  preset: "generic" | "openclaw";
+  headers?: Record<string, string>;
+  /**
+   * Output shape. Only "generic" today: POST the raw signed WakeEvent — the
+   * vendor-neutral contract; the consumer decides what it means. Defaults to
+   * "generic".
+   */
+  preset?: "generic";
 }
 
 /**

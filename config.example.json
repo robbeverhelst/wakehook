@@ -23,15 +23,13 @@
   "subscribers": [
     {
       "id": "openclaw",
-      "url": "http://localhost:3000/hooks/wake",
-      "secret": "your-openclaw-hook-token",
-      "preset": "openclaw"
+      "url": "http://localhost:18789/hooks/wakehook",
+      "headers": { "Authorization": "Bearer your-openclaw-hooks-token" }
     },
     {
       "id": "example-generic",
       "url": "https://example.com/awake",
-      "secret": "per-subscriber-hmac-secret",
-      "preset": "generic"
+      "secret": "per-subscriber-hmac-secret"
     }
   ]
 }

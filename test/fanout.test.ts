@@ -39,29 +39,33 @@ describe("fanout", () => {
     expect(sig).toBe(expected);
   });
 
-  test("openclaw preset sends a factual nudge + bearer auth", async () => {
-    let received: { body: any; auth: string | null } | null = null;
+  test("custom headers are sent; no secret means no signature", async () => {
+    let received: { body: any; auth: string | null; sig: string | null } | null = null;
     const server = Bun.serve({
       port: 0,
       async fetch(req) {
-        received = { body: await req.json(), auth: req.headers.get("authorization") };
+        received = {
+          body: await req.json(),
+          auth: req.headers.get("authorization"),
+          sig: req.headers.get("x-wake-signature"),
+        };
         return new Response("ok");
       },
     });
+    // OpenClaw-style: raw event + a bearer header, no HMAC secret.
     const sub: Subscriber = {
-      id: "openclaw-1",
-      url: `http://localhost:${server.port}/hooks/wake`,
-      secret: "tok",
-      preset: "openclaw",
+      id: "openclaw",
+      url: `http://localhost:${server.port}/hooks/wakehook`,
+      headers: { Authorization: "Bearer tok" },
     };
 
     const res = await fanout(event, [sub], store);
     server.stop();
 
     expect(res.delivered).toBe(1);
-    expect(received!.body.mode).toBe("now");
-    expect(received!.body.text).toContain("woke at");
+    expect(received!.body.event).toBe("user.awake"); // raw neutral event, not pre-formatted
     expect(received!.auth).toBe("Bearer tok");
+    expect(received!.sig).toBeNull(); // no secret → unsigned
   });
 
   test("one failing subscriber does not block the others", async () => {
