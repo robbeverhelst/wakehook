@@ -142,6 +142,46 @@ bunx wakehook
 Keep it running (long-lived process / service). In poll mode it polls Google
 every `pollIntervalMs` and, on the morning wake, POSTs OpenClaw once.
 
+## Step 6 — decide what happens on wake (optional)
+
+By default the Step-1 mapping just nudges the main session. To make waking up
+*do* something, shape the behavior in the **mapping** (this is OpenClaw-side
+config, not wakehook). wakehook only supplies the trigger; the actual abilities
+(calendar, weather, messages, …) come from **OpenClaw's own skills/tools** —
+install/enable those separately.
+
+**A — simple nudge, routine in the prompt** (`action: "wake"`): make
+`messageTemplate` the instruction the main session executes.
+
+```json5
+{
+  match: { path: "wakehook" },
+  action: "wake",
+  wakeMode: "now",
+  messageTemplate: "Good morning — the user just woke ({{wokeAt}}). Run the morning routine: review today's calendar, summarize overnight messages, and give the weather.",
+}
+```
+
+**B — full routine run on a dedicated agent** (`action: "agent"`): route to an
+agent that has the relevant skills, and deliver the result to a chat surface.
+
+```json5
+{
+  match: { path: "wakehook" },
+  action: "agent",
+  agentId: "morning",          // an agent you've set up with calendar/weather/etc. skills
+  wakeMode: "now",
+  messageTemplate: "User woke at {{wokeAt}} (slept {{session.durationMin}} min). Produce the morning briefing.",
+  deliver: true,               // send the result back to a chat surface…
+  channel: "last",             // …e.g. Telegram/Discord (defaults to last used)
+}
+```
+
+Note: you generally **don't** trigger a cron from this — wakehook *is* the real
+wake signal, so it replaces guessing a fixed time. Just run the task on the event.
+The capabilities themselves are separate OpenClaw skills; this step only wires
+*when* and *what to ask for*.
+
 ## What OpenClaw receives
 
 wakehook POSTs the raw, neutral event (the OpenClaw mapping templates it):
