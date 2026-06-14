@@ -10,7 +10,8 @@ Plug in your sleep data, get a clean `user.awake` event — then make your morni
 
 <br>
 
-![status](https://img.shields.io/badge/status-v1-FF8A4B)
+[![npm](https://img.shields.io/npm/v/wakehook?logo=npm&color=cb3837)](https://www.npmjs.com/package/wakehook)
+[![ghcr](https://img.shields.io/badge/ghcr.io-wakehook-2496ED?logo=docker&logoColor=white)](https://github.com/robbeverhelst/wakehook/pkgs/container/wakehook)
 ![runtime](https://img.shields.io/badge/built%20with-Bun-000000?logo=bun)
 ![lang](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-43b581)
@@ -102,13 +103,25 @@ X-Wake-Event-Id: <user>:<wokeAt>
 
 ## 🚀 Quick start
 
+Two ways to run it (it's a Bun service — the npm package is **Bun-only**):
+
+```bash
+# A) Docker (recommended — nothing to install but Docker)
+docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook
+
+# B) Bun, straight from npm
+bunx wakehook              # serve;  bunx wakehook-auth  for the one-time Google authorization
+```
+
+…or from source:
+
 ```bash
 bun install
 cp config.example.json config.json     # edit subscribers + timezone; secrets can live in env
 cp .env.example .env                    # GOOGLE_CLIENT_ID / SECRET / WEBHOOK_AUTH_TOKEN
 
 bun run auth        # one-time Google authorization (mints the refresh token)
-bun run dev         # or: bun run start  /  docker build -t wakehook . && docker run ...
+bun run dev         # or: bun run start
 ```
 
 Then expose `/webhook` publicly — Cloudflare Tunnel, reverse proxy, VPS, your call; wakehook

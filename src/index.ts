@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /** Entry point: load config, open the store, wire the configured source, serve. */
 import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";

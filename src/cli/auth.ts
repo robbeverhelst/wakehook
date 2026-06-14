@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * One-time authorization: opens the consent flow, captures the redirect on a
  * temporary local listener, exchanges the code, and stores the refresh token.
