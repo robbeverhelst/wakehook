@@ -88,7 +88,7 @@ Tuned to two priorities:
 
 ```http
 POST <subscriber-url>
-X-Wake-Signature: sha256=<hmac of body with the subscriber's secret>
+X-Wake-Signature: sha256=<hmac of body with the subscriber's secret>   # only if "secret" is set
 X-Wake-Event-Id: <user>:<wokeAt>
 
 { "event": "user.awake", "wokeAt": "2026-06-14T07:03:00+02:00",
@@ -96,10 +96,19 @@ X-Wake-Event-Id: <user>:<wokeAt>
   "session": { "start": "...", "end": "...", "durationMin": 431 } }
 ```
 
-- **`generic`** subscribers get exactly this — the vendor-neutral, signed contract.
-- **`openclaw`** subscribers instead get a factual nudge
-  (`POST /hooks/wake { "text": "You woke at 07:03 (slept 7h11m).", "mode": "now" }`) — and
-  OpenClaw decides what to run.
+Every subscriber gets exactly this — one **vendor-neutral** event. The bus does
+not format per-consumer; the consumer decides what it means. Two knobs per
+subscriber:
+
+- **`secret`** *(optional)* — when set, the body is signed as `X-Wake-Signature`
+  (HMAC-SHA256) so the receiver can verify authenticity.
+- **`headers`** *(optional)* — extra request headers to satisfy the receiver's
+  own auth, e.g. `{ "Authorization": "Bearer <token>" }`.
+
+**OpenClaw:** point `url` at a [mapped hook](https://docs.openclaw.ai/gateway/configuration-reference)
+(`/hooks/<name>`), pass the gateway's hook token via `headers`, and let OpenClaw
+turn the event into a wake/agent action with `hooks.mappings`. The
+[`SKILL.md`](./SKILL.md) walks an agent through it.
 
 ## 🚀 Quick start
 
@@ -135,7 +144,7 @@ docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook
   },
   "google": { "mode": "poll", "pollIntervalMs": 900000, "pollLookbackMin": 720 },
   "subscribers": [
-    { "id": "openclaw", "url": "https://your-openclaw/hooks/wake", "secret": "shared-secret", "preset": "openclaw" }
+    { "id": "openclaw", "url": "http://localhost:18789/hooks/wakehook", "headers": { "Authorization": "Bearer <openclaw-hooks-token>" } }
   ]
 }
 ```
@@ -211,7 +220,7 @@ The server mounts `/webhook` only for push sources; the scheduler drives poll so
 Health implements **both** (selectable via `google.mode`) — proof the interface carries either
 kind with no core changes.
 
-➕ **New subscriber shape?** Add a `preset` branch in `src/subscribers/fanout.ts`.
+➕ **Receiver needs its own auth?** Set `headers` on the subscriber (e.g. a bearer token) — no code change.
 
 ## 🛠️ Stack
 
@@ -220,8 +229,9 @@ kind with no core changes.
 
 ## 📍 Status
 
-v1: Google Health source + wake inference + signed fan-out + `openclaw`/`generic` presets,
-with a generic push/poll `Source` interface ready for more providers. The Google
+v1: Google Health source + wake inference + signed fan-out of one neutral
+`user.awake` event (per-subscriber `secret`/`headers`), with a generic push/poll
+`Source` interface ready for more providers. The Google
 sleep-response field mapping (`mapSession`) is isolated in one place so it can be confirmed
 against the live API.
 
