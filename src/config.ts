@@ -38,10 +38,18 @@ export interface GoogleHealthConfig {
    *  - "both"    — push primary, poll as a safety net.
    */
   mode: GoogleMode;
-  /** Poll cadence in ms (when mode includes poll). */
+  /** Poll cadence in ms (when mode includes poll). Lower = faster wake, more calls. */
   pollIntervalMs: number;
   /** How far back each poll scans for recent sleep, in minutes. */
   pollLookbackMin: number;
+  /**
+   * Only poll around the morning window (inference.windowStart..windowEnd ±
+   * pollWindowMarginMin) and stop once we've fired today — instead of all day.
+   * Cuts API calls dramatically; set false to poll on every tick, 24/7.
+   */
+  pollWindowOnly: boolean;
+  /** Minutes of slack before windowStart / after windowEnd to still poll. */
+  pollWindowMarginMin: number;
 }
 
 export interface Config {
@@ -68,6 +76,12 @@ const DEFAULTS = {
 
 function env(name: string, fallback = ""): string {
   return process.env[name] ?? fallback;
+}
+
+function envBool(name: string, fallback: boolean): boolean {
+  const v = process.env[name];
+  if (v === undefined) return fallback;
+  return v === "true" || v === "1";
 }
 
 function normalizeMode(v: string): GoogleMode {
@@ -100,10 +114,14 @@ export function loadConfig(): Config {
     ),
     mode: normalizeMode(env("GOOGLE_MODE", file.google?.mode ?? "webhook")),
     pollIntervalMs: Number(
-      env("GOOGLE_POLL_INTERVAL_MS", String(file.google?.pollIntervalMs ?? 900_000)),
+      env("GOOGLE_POLL_INTERVAL_MS", String(file.google?.pollIntervalMs ?? 300_000)),
     ),
     pollLookbackMin: Number(
       env("GOOGLE_POLL_LOOKBACK_MIN", String(file.google?.pollLookbackMin ?? 720)),
+    ),
+    pollWindowOnly: envBool("GOOGLE_POLL_WINDOW_ONLY", file.google?.pollWindowOnly ?? true),
+    pollWindowMarginMin: Number(
+      env("GOOGLE_POLL_WINDOW_MARGIN_MIN", String(file.google?.pollWindowMarginMin ?? 30)),
     ),
   };
 

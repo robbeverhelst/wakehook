@@ -14,7 +14,7 @@ const source = createSource(cfg.source, cfg, store);
 const app = buildServer(cfg, source, engine);
 
 // Poll-based sources run on a timer; push-based ones are driven by /webhook.
-startPolling(source, engine);
+startPolling(source, engine, cfg, store);
 
 if (source.webhook && !cfg.google.webhookAuthToken) {
   console.warn(
