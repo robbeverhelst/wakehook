@@ -16,7 +16,7 @@
     "webhookAuthToken": "a-long-random-string-google-must-present",
     "scopes": ["https://www.googleapis.com/auth/googlehealth.sleep.readonly"],
     "apiBase": "https://health.googleapis.com/v4",
-    "mode": "webhook",
+    "mode": "poll",
     "pollIntervalMs": 900000,
     "pollLookbackMin": 720
   },

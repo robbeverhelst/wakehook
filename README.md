@@ -103,46 +103,66 @@ X-Wake-Event-Id: <user>:<wokeAt>
 
 ## 🚀 Quick start
 
-Two ways to run it (it's a Bun service — the npm package is **Bun-only**):
+**Prerequisites:** [Bun](https://bun.sh) ≥ 1.3 (it's a Bun service — the npm package is
+**Bun-only**, it imports `bun:sqlite`), and a Google Cloud project with the **Health API**
+enabled, an **OAuth 2.0 client** (id + secret), and the `googlehealth.sleep.readonly` scope —
+see [Google setup notes](#-google-setup-notes).
+
+The simplest path is **poll mode**: wakehook pulls sleep from the API on a timer, so all traffic
+is **outbound — no public URL or tunnel needed.** (Want *instant* fires? See
+[Webhook mode](#-webhook-mode-advanced).)
+
+**1 · Install**
 
 ```bash
-# A) Docker (recommended — nothing to install but Docker)
+bunx wakehook                 # run without installing — or: bun add wakehook
+# or Docker:
 docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook
-
-# B) Bun, straight from npm
-bunx wakehook              # serve;  bunx wakehook-auth  for the one-time Google authorization
 ```
 
-…or from source:
+**2 · Configure** — create `config.json` in your working directory:
+
+```json
+{
+  "dbPath": "./wake.sqlite",
+  "source": "google-health",
+  "inference": {
+    "timezone": "Europe/Brussels",
+    "windowStart": "04:00",
+    "windowEnd": "11:00",
+    "minDurationMin": 180,
+    "supersedeGapMin": 45
+  },
+  "google": { "mode": "poll", "pollIntervalMs": 900000, "pollLookbackMin": 720 },
+  "subscribers": [
+    { "id": "openclaw", "url": "https://your-openclaw/hooks/wake", "secret": "shared-secret", "preset": "openclaw" }
+  ]
+}
+```
+
+…and a `.env` with your OAuth credentials (keep these out of `config.json`):
 
 ```bash
-bun install
-cp config.example.json config.json     # edit subscribers + timezone; secrets can live in env
-cp .env.example .env                    # GOOGLE_CLIENT_ID / SECRET / WEBHOOK_AUTH_TOKEN
-
-bun run auth        # one-time Google authorization (mints the refresh token)
-bun run dev         # or: bun run start
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=http://localhost:8080/oauth/callback
 ```
 
-Then expose `/webhook` publicly — Cloudflare Tunnel, reverse proxy, VPS, your call; wakehook
-bakes in **no ingress assumptions** — and create a Google Health **sleep** webhook subscription
-pointing at it.
+**3 · Authorize once** — opens a Google consent URL, then stores a refresh token in the sqlite
+DB (it auto-refreshes forever after):
 
-### 🔌 No public URL? Poll instead
-
-Don't want to expose anything? Run the Google Health source in **poll** mode — it pulls recent
-sleep from the API on a timer, so all traffic is **outbound** (no inbound URL, no tunnel). Same
-inference and once-per-morning dedup; you just fire on the next tick instead of instantly.
-
-```jsonc
-// config.json → "google"
-"mode": "poll",            // "webhook" (default) | "poll" | "both"
-"pollIntervalMs": 900000,  // every 15 min
-"pollLookbackMin": 720     // scan the last 12h of sleep each tick
+```bash
+bunx wakehook-auth            # from source: bun run auth
 ```
 
-Poll still needs the OAuth creds + `bun run auth` (you're calling Google's API) — it only drops
-the *ingress* requirement. `"both"` keeps the webhook as primary with poll as a safety net.
+**4 · Run it** — it now polls Google every 15 min and fans a signed `user.awake` out to your
+subscribers, at most once per morning:
+
+```bash
+bunx wakehook                 # from source: bun run start  (bun run dev to watch)
+```
+
+No inbound URL anywhere. Tune cadence with `pollIntervalMs` / `pollLookbackMin`.
 
 ### 🧪 Test it without waiting for morning
 
@@ -152,6 +172,19 @@ curl -X POST http://localhost:8080/test/replay \
   -H 'Content-Type: application/json' \
   -d '{}'    # fires a synthetic wake "now"; pass {"end":"...","durationMin":420} to control it
 ```
+
+### 📡 Webhook mode (advanced)
+
+For *instant* fires, Google Health can **push** to wakehook instead of being polled: set
+`"mode": "webhook"`, set `webhookAuthToken` (env `GOOGLE_WEBHOOK_AUTH_TOKEN` — the token Google
+must present), expose `/webhook` over public HTTPS (Cloudflare Tunnel / reverse proxy / VPS —
+wakehook makes **no ingress assumptions**), and register a Google Health **sleep** webhook
+subscription pointing at it.
+
+> ⚠️ **Status:** the **poll** path is verified end-to-end against the live API. The webhook
+> *notification parsing* and the *subscription-creation* step are **not yet verified/implemented** —
+> stick with poll unless you're ready to wire and test the push contract yourself. `"both"` runs
+> poll with the webhook as an experimental safety net.
 
 ## 🔑 Google setup notes
 
