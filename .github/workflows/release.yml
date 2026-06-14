@@ -33,7 +33,7 @@ jobs:
       # semantic-release v25 requires Node >=22.14.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       # OIDC trusted publishing needs npm >= 11.5.1 (runner ships 10.x).
       - run: npm install -g npm@latest
 
