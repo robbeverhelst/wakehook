@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/robbeverhelst/wakehook/compare/v1.0.0...v1.1.0) (2026-06-14)
+
+
+### Features
+
+* **poll:** window-gated polling around the morning window ([ad938c7](https://github.com/robbeverhelst/wakehook/commit/ad938c7172c2e6543e5ed508e83bedd1f046780c))
+
 # [1.0.0](https://github.com/robbeverhelst/wakehook/compare/v0.2.0...v1.0.0) (2026-06-14)
 
 

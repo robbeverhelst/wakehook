@@ -1,6 +1,6 @@
 {
   "name": "wakehook",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A self-hosted webhook that fires when you wake up. Your sleep data in, a signed user.awake event out.",
   "type": "module",
   "module": "src/index.ts",
