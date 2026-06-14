@@ -48,7 +48,6 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "auth": "bun src/cli/auth.ts",
-    "subscribe": "bun src/cli/subscribe.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
