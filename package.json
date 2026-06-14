@@ -1,7 +1,7 @@
 {
   "name": "wakehook",
   "version": "0.2.0",
-  "description": "Vendor-neutral wake-detection webhook bus: turns Google Health sleep data into a signed user.awake event broadcast to any subscriber.",
+  "description": "A self-hosted webhook that fires when you wake up. Your sleep data in, a signed user.awake event out.",
   "type": "module",
   "module": "src/index.ts",
   "license": "MIT",
