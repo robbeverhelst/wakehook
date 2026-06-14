@@ -1,6 +1,6 @@
 {
   "name": "wakehook",
-  "version": "0.2.0",
+  "version": "0.0.0-development",
   "description": "Vendor-neutral wake-detection webhook bus: turns Google Health sleep data into a signed user.awake event broadcast to any subscriber.",
   "type": "module",
   "module": "src/index.ts",
@@ -59,8 +59,9 @@
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
+    "@semantic-release/npm": "^13.1.0",
     "@types/bun": "latest",
-    "semantic-release": "^24.2.0",
+    "semantic-release": "^25.0.5",
     "typescript": "^5.7.2"
   }
 }
