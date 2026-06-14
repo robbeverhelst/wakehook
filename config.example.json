@@ -17,8 +17,10 @@
     "scopes": ["https://www.googleapis.com/auth/googlehealth.sleep.readonly"],
     "apiBase": "https://health.googleapis.com/v4",
     "mode": "poll",
-    "pollIntervalMs": 900000,
-    "pollLookbackMin": 720
+    "pollIntervalMs": 300000,
+    "pollLookbackMin": 720,
+    "pollWindowOnly": true,
+    "pollWindowMarginMin": 30
   },
   "subscribers": [
     {

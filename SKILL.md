@@ -64,9 +64,10 @@ session.)
 Two modes — confirm which they want; **don't assume**:
 
 - **poll** *(recommended default)* — wakehook pulls from Google on a timer.
-  **No public URL / tunnel / open port** (all outbound). Trade-off: it fires on
-  the next tick, so up to `pollIntervalMs` late (15 min by default). This path is
-  verified end-to-end.
+  **No public URL / tunnel / open port** (all outbound). By default it only polls
+  around the morning window and stops once it has fired today (`pollWindowOnly`),
+  so a short `pollIntervalMs` (5 min default) is cheap — wake is detected within
+  one interval. This path is verified end-to-end.
 - **webhook** — Google pushes the instant data lands → fires immediately, but
   requires a **public HTTPS endpoint** for wakehook plus registering a Google
   Health sleep subscription. ⚠️ This path is **not yet verified** — only choose
@@ -91,7 +92,7 @@ IANA zone, the subscriber `url` to the mapped hook from Step 1, and pass the
     "minDurationMin": 180,
     "supersedeGapMin": 45
   },
-  "google": { "mode": "poll", "pollIntervalMs": 900000, "pollLookbackMin": 720 },
+  "google": { "mode": "poll", "pollIntervalMs": 300000, "pollLookbackMin": 720, "pollWindowOnly": true, "pollWindowMarginMin": 30 },
   "subscribers": [
     {
       "id": "openclaw",
@@ -140,7 +141,8 @@ bunx wakehook
 
 (Docker alt: `docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook`.)
 Keep it running (long-lived process / service). In poll mode it polls Google
-every `pollIntervalMs` and, on the morning wake, POSTs OpenClaw once.
+every `pollIntervalMs` **around the morning window only** (set `pollWindowOnly:
+false` to poll all day) and, on the morning wake, POSTs OpenClaw once.
 
 ## Step 6 — decide what happens on wake (optional)
 

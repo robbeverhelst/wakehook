@@ -142,7 +142,7 @@ docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook
     "minDurationMin": 180,
     "supersedeGapMin": 45
   },
-  "google": { "mode": "poll", "pollIntervalMs": 900000, "pollLookbackMin": 720 },
+  "google": { "mode": "poll", "pollIntervalMs": 300000, "pollLookbackMin": 720, "pollWindowOnly": true, "pollWindowMarginMin": 30 },
   "subscribers": [
     { "id": "openclaw", "url": "http://localhost:18789/hooks/wakehook", "headers": { "Authorization": "Bearer <openclaw-hooks-token>" } }
   ]
@@ -171,7 +171,10 @@ subscribers, at most once per morning:
 bunx wakehook                 # from source: bun run start  (bun run dev to watch)
 ```
 
-No inbound URL anywhere. Tune cadence with `pollIntervalMs` / `pollLookbackMin`.
+No inbound URL anywhere. By default (`pollWindowOnly`) it only polls around the
+morning window (`windowStart..windowEnd` ± `pollWindowMarginMin`) and stops once
+it has fired for the day — so a short `pollIntervalMs` (e.g. 2–5 min) gives a fast
+wake without hammering the API all day. Set `pollWindowOnly: false` to poll 24/7.
 
 ### 🧪 Test it without waiting for morning
 
