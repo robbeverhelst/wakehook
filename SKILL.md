@@ -1,19 +1,25 @@
 ---
 name: wakehook
-description: Install, configure, authorize and run wakehook so OpenClaw runs the user's morning routine when they wake up. wakehook turns Google Health / Fitbit sleep data into a neutral user.awake event and POSTs it to an OpenClaw mapped hook, which turns it into a wake action. Use when the user wants wake-triggered automations, mentions wakehook, or asks to "do something when I wake up".
+description: Install, configure, authorize and run wakehook so the user's agent (OpenClaw or Hermes) runs their morning routine when they wake up. wakehook turns Google Health / Fitbit sleep data into a neutral user.awake event and POSTs it to the agent's inbound webhook, which turns it into a wake/agent action. Use when the user wants wake-triggered automations, mentions wakehook, or asks to "do something when I wake up".
 homepage: https://github.com/robbeverhelst/wakehook
+metadata:
+  hermes:
+    category: automation
+    tags: [wake, sleep, google-health, fitbit, morning, webhook]
 ---
 
-# wakehook → OpenClaw
+# wakehook → your agent
 
 `wakehook` is a tiny self-hosted service that watches the user's sleep data
-(Google Health / Fitbit), detects the moment they **woke up**, and POSTs OpenClaw
-a neutral `user.awake` event so the morning routine runs itself — at most once
-per morning. OpenClaw maps that event into a wake action (its native pattern), so
-wakehook stays vendor-neutral.
+(Google Health / Fitbit), detects the moment they **woke up**, and POSTs the
+user's agent a neutral `user.awake` event so the morning routine runs itself — at
+most once per morning. The agent maps that event into a wake/agent action (its
+native pattern), so wakehook stays vendor-neutral.
 
-Work through the steps in order. **Ask the user** at the decision points instead
-of assuming. Do not improvise from the README — these steps are verified.
+This works with **OpenClaw** and **Hermes Agent** — they both ingest a webhook and
+template it. Everything below is shared except **Step 1**, where you pick the
+agent. Work through the steps in order. **Ask the user** at the decision points
+instead of assuming. Do not improvise from the README — these steps are verified.
 
 ## Prerequisites (check, don't assume)
 
@@ -25,11 +31,16 @@ of assuming. Do not improvise from the README — these steps are verified.
    user-consented OAuth. Ask the user for the id + secret (reuse their existing
    Google project if they have one).
 
-## Step 1 — add an OpenClaw mapped hook
+## Step 1 — wire wakehook to the agent (pick OpenClaw **or** Hermes)
 
-wakehook POSTs the raw `user.awake` event to an OpenClaw **mapped hook**; OpenClaw
-turns it into a wake of the main session via `hooks.mappings`. In the OpenClaw
-gateway config:
+wakehook POSTs the raw `user.awake` event to the agent's inbound webhook; the
+agent templates it into a wake. Do the subsection for the user's agent — it gives
+both the **agent-side config** and the matching **wakehook subscriber** (drop the
+subscriber into `config.json` in Step 3).
+
+### Option A — OpenClaw (mapped hook)
+
+In the OpenClaw gateway config, enable hooks and add a mapping:
 
 ```json5
 {
@@ -43,7 +54,6 @@ gateway config:
         action: "wake",
         wakeMode: "now",
         name: "wakehook",
-        // reads fields straight from wakehook's user.awake event:
         messageTemplate: "You woke at {{wokeAt}} (slept {{session.durationMin}} min).",
       },
     ],
@@ -51,13 +61,42 @@ gateway config:
 }
 ```
 
-Note the gateway address (host + port — OpenClaw's docs examples use
-`127.0.0.1:18789`; confirm the user's actual port). The delivery URL is then
-`http://<gateway-host>:<port>/hooks/wakehook`, and `<HOOKS_TOKEN>` is the token
-wakehook must present. (Verified: `/hooks/*` is gated by the token in a header —
-`Authorization: Bearer <token>` or `x-openclaw-token: <token>`; query-string
-tokens are rejected. The mapping then renders `messageTemplate` and wakes the
-session.)
+Gateway address: OpenClaw's docs examples use `127.0.0.1:18789` — confirm the
+user's port. `/hooks/*` is gated by the token in a header (`Authorization: Bearer`
+or `x-openclaw-token`). wakehook subscriber:
+
+```json
+{ "id": "openclaw", "url": "http://<host>:<port>/hooks/wakehook",
+  "headers": { "Authorization": "Bearer <HOOKS_TOKEN>" } }
+```
+
+### Option B — Hermes Agent (webhook route)
+
+In the Hermes webhook config, add a route with a `prompt` template + secret:
+
+```yaml
+platforms:
+  webhook:
+    enabled: true
+    extra:
+      port: 8644
+      routes:
+        wakehook:
+          secret: "<ROUTE_SECRET>"
+          prompt: "The user woke at {wokeAt} (slept {session.durationMin} min). Run the morning routine."
+          # deliver: telegram   # optional: send the result to a chat
+```
+
+Hermes verifies an HMAC signature; wakehook signs with the route secret under the
+header Hermes expects. wakehook subscriber:
+
+```json
+{ "id": "hermes", "url": "http://<host>:8644/webhooks/wakehook",
+  "secret": "<ROUTE_SECRET>", "signatureHeader": "X-Webhook-Signature", "signatureFormat": "hex" }
+```
+
+> On loopback you can skip signing entirely with Hermes's `INSECURE_NO_AUTH` and
+> drop `secret`/`signatureHeader`/`signatureFormat`.
 
 ## Step 2 — choose how wakehook gets the sleep data (ask the user)
 
@@ -78,8 +117,7 @@ If the user has no preference, use **poll**.
 ## Step 3 — configure wakehook
 
 Create **`config.json`** in the working directory. Set `timezone` to the user's
-IANA zone, the subscriber `url` to the mapped hook from Step 1, and pass the
-`<HOOKS_TOKEN>` as the `Authorization` header:
+IANA zone and drop in the **subscriber from Step 1** (the OpenClaw or Hermes one):
 
 ```json
 {
@@ -94,18 +132,18 @@ IANA zone, the subscriber `url` to the mapped hook from Step 1, and pass the
   },
   "google": { "mode": "poll", "pollIntervalMs": 300000, "pollLookbackMin": 720, "pollWindowOnly": true, "pollWindowMarginMin": 30 },
   "subscribers": [
-    {
-      "id": "openclaw",
-      "url": "http://<gateway-host>:<port>/hooks/wakehook",
-      "headers": { "Authorization": "Bearer <HOOKS_TOKEN>" }
-    }
+    { "id": "openclaw", "url": "http://<host>:<port>/hooks/wakehook", "headers": { "Authorization": "Bearer <HOOKS_TOKEN>" } }
   ]
 }
 ```
 
-> No `preset` needed — `generic` (the raw signed event) is the default and is what
-> the OpenClaw mapping expects. `<HOOKS_TOKEN>` must equal the gateway's
-> `hooks.token` from Step 1.
+> The `subscribers` array above uses the **OpenClaw** entry; swap it for the
+> **Hermes** entry from Step 1 if that's the agent. You can list both to fan out
+> to multiple agents.
+
+> No `preset` needed — `generic` (the raw event) is the default and is what both
+> agents' mappings/routes expect. The subscriber's auth (the OpenClaw bearer or the
+> Hermes secret/signature) must match the agent config from Step 1.
 >
 > If the user chose **webhook** mode instead: set `"google"` to
 > `{ "mode": "webhook", "webhookAuthToken": "<random>" }`, also put
@@ -142,15 +180,18 @@ bunx wakehook
 (Docker alt: `docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook`.)
 Keep it running (long-lived process / service). In poll mode it polls Google
 every `pollIntervalMs` **around the morning window only** (set `pollWindowOnly:
-false` to poll all day) and, on the morning wake, POSTs OpenClaw once.
+false` to poll all day) and, on the morning wake, POSTs the agent once.
 
 ## Step 6 — decide what happens on wake (optional)
 
-By default the Step-1 mapping just nudges the main session. To make waking up
-*do* something, shape the behavior in the **mapping** (this is OpenClaw-side
-config, not wakehook). wakehook only supplies the trigger; the actual abilities
-(calendar, weather, messages, …) come from **OpenClaw's own skills/tools** —
-install/enable those separately.
+By default the Step-1 hook just nudges the agent. To make waking up *do*
+something, shape the behavior on the **agent side** (the OpenClaw mapping or the
+Hermes route `prompt`) — not in wakehook. wakehook only supplies the trigger; the
+actual abilities (calendar, weather, messages, …) come from the **agent's own
+skills/tools** — install/enable those separately.
+
+For OpenClaw the lever is the mapping; for Hermes it's the route `prompt` (and
+`deliver:`). OpenClaw mapping examples:
 
 **A — simple nudge, routine in the prompt** (`action: "wake"`): make
 `messageTemplate` the instruction the main session executes.
@@ -181,27 +222,26 @@ agent that has the relevant skills, and deliver the result to a chat surface.
 
 Note: you generally **don't** trigger a cron from this — wakehook *is* the real
 wake signal, so it replaces guessing a fixed time. Just run the task on the event.
-The capabilities themselves are separate OpenClaw skills; this step only wires
-*when* and *what to ask for*.
+The capabilities themselves are separate agent skills; this step only wires *when*
+and *what to ask for*.
 
-## What OpenClaw receives
+## What the agent receives
 
-wakehook POSTs the raw, neutral event (the OpenClaw mapping templates it):
+wakehook POSTs the raw, neutral event; the agent's mapping/route templates it:
 
 ```
-POST http://<gateway-host>:<port>/hooks/wakehook
-Authorization: Bearer <HOOKS_TOKEN>
+POST http://<host>:<port>/<your-agent-route>
 Content-Type: application/json
+<auth header per Step 1: Authorization: Bearer …  (OpenClaw)  or  X-Webhook-Signature: …  (Hermes)>
 
 { "event": "user.awake", "wokeAt": "2026-06-13T08:04:00Z", "user": "self",
   "source": "google-health",
   "session": { "start": "...", "end": "2026-06-13T08:04:00Z", "durationMin": 464 } }
 ```
 
-The Step-1 mapping turns this into a `now` wake of the main session with the
-templated text — handle that as the trigger to run the morning routine. wakehook
-also sends `X-Wake-Event-Id` (and `X-Wake-Signature` if a `secret` is set) for
-optional extra verification. Fires at most once per morning.
+The agent turns this into a `now` wake with the templated text — handle that as
+the trigger to run the morning routine. wakehook also sends `X-Wake-Event-Id` for
+idempotency. Fires at most once per morning.
 
 ## Verify without waiting for morning
 
@@ -211,14 +251,16 @@ curl -X POST http://localhost:8080/test/replay \
 ```
 
 Injects a synthetic wake "now" and delivers it exactly like a real one — confirm
-OpenClaw maps it and runs the routine.
+the agent maps it and runs the routine.
 
 ## Gotchas
 
 - **Bun-only** — never run with Node.
-- The `Authorization` bearer MUST equal OpenClaw's gateway `hooks.token`, or
-  `/hooks/wakehook` rejects it (401). Hooks must be **enabled** and the
-  **mapping** (`match.path: "wakehook"`) must exist, or the path won't route.
+- **Auth must match the agent (else 401):** OpenClaw — the `Authorization` bearer
+  must equal the gateway `hooks.token`, hooks **enabled**, and the **mapping**
+  exists. Hermes — `secret` must equal the route secret and `signatureHeader` /
+  `signatureFormat` must match (`X-Webhook-Signature` / `hex`), with the route
+  defined; or use `INSECURE_NO_AUTH` on loopback.
 - **poll** needs the OAuth creds but **no inbound URL**; **webhook** is instant
   but unverified — prefer poll unless the user asks otherwise.
 - A Google **API key is not enough** — it needs the OAuth client + `wakehook-auth`.
