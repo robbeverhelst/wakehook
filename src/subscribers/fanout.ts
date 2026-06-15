@@ -11,8 +11,9 @@ import type { Store } from "../db.ts";
 const MAX_ATTEMPTS = 4;
 const BASE_BACKOFF_MS = 500;
 
-function sign(body: string, secret: string): string {
-  return "sha256=" + createHmac("sha256", secret).update(body).digest("hex");
+function sign(body: string, sub: Subscriber): string {
+  const hex = createHmac("sha256", sub.secret!).update(body).digest("hex");
+  return sub.signatureFormat === "hex" ? hex : `sha256=${hex}`;
 }
 
 async function deliverOne(
@@ -26,8 +27,8 @@ async function deliverOne(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-Wake-Event-Id": eventId,
-    ...(sub.secret ? { "X-Wake-Signature": sign(body, sub.secret) } : {}),
     ...(sub.headers ?? {}),
+    ...(sub.secret ? { [sub.signatureHeader ?? "X-Wake-Signature"]: sign(body, sub) } : {}),
   };
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

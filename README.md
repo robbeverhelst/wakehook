@@ -97,11 +97,13 @@ X-Wake-Event-Id: <user>:<wokeAt>
 ```
 
 Every subscriber gets exactly this — one **vendor-neutral** event. The bus does
-not format per-consumer; the consumer decides what it means. Two knobs per
-subscriber:
+not format per-consumer; the consumer decides what it means. Per-subscriber knobs:
 
-- **`secret`** *(optional)* — when set, the body is signed as `X-Wake-Signature`
-  (HMAC-SHA256) so the receiver can verify authenticity.
+- **`secret`** *(optional)* — when set, the body is HMAC-SHA256 signed so the
+  receiver can verify authenticity.
+- **`signatureHeader`** *(optional, default `X-Wake-Signature`)* — header the
+  signature rides in; **`signatureFormat`** is `prefixed` (`sha256=<hex>`, default)
+  or `hex` (bare). Set these to match a receiver's expected header.
 - **`headers`** *(optional)* — extra request headers to satisfy the receiver's
   own auth, e.g. `{ "Authorization": "Bearer <token>" }`.
 
@@ -109,6 +111,24 @@ subscriber:
 (`/hooks/<name>`), pass the gateway's hook token via `headers`, and let OpenClaw
 turn the event into a wake/agent action with `hooks.mappings`. The
 [`SKILL.md`](./SKILL.md) walks an agent through it.
+
+**[Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/webhooks):**
+point `url` at a Hermes webhook route (`:8644/webhooks/<route>`), set `secret` to
+the route secret with `signatureHeader: "X-Webhook-Signature"`, `signatureFormat:
+"hex"`, and write the route's `prompt` template (`{wokeAt}`, `{session.durationMin}`).
+On loopback you can skip signing with Hermes's `INSECURE_NO_AUTH`.
+
+### 🤖 Install the skill into your agent
+
+[`SKILL.md`](./SKILL.md) (one skill, both agents) walks the agent through the
+whole setup — install, configure, authorize, run, and wire the hook. Add it with:
+
+```bash
+# OpenClaw
+openclaw skills install git:robbeverhelst/wakehook   # or: openclaw skills install wakehook (ClawHub)
+# Hermes Agent — zero-infra tap (reads the root SKILL.md)
+hermes skills tap add robbeverhelst/wakehook
+```
 
 ## 🚀 Quick start
 

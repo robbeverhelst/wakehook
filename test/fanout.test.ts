@@ -68,6 +68,36 @@ describe("fanout", () => {
     expect(received!.sig).toBeNull(); // no secret → unsigned
   });
 
+  test("signs under a custom header in raw-hex format (Hermes-style)", async () => {
+    let received: { sig: string | null; defaultSig: string | null } | null = null;
+    const server = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        received = {
+          sig: req.headers.get("x-webhook-signature"),
+          defaultSig: req.headers.get("x-wake-signature"),
+        };
+        return new Response("ok");
+      },
+    });
+    const sub: Subscriber = {
+      id: "hermes",
+      url: `http://localhost:${server.port}/webhooks/wakehook`,
+      secret: "route-secret",
+      signatureHeader: "X-Webhook-Signature",
+      signatureFormat: "hex",
+    };
+
+    const res = await fanout(event, [sub], store);
+    server.stop();
+
+    const body = JSON.stringify(event);
+    const expectedHex = createHmac("sha256", "route-secret").update(body).digest("hex");
+    expect(res.delivered).toBe(1);
+    expect(received!.sig).toBe(expectedHex); // bare hex, custom header
+    expect(received!.defaultSig).toBeNull(); // not under the default header
+  });
+
   test("one failing subscriber does not block the others", async () => {
     const ok = Bun.serve({ port: 0, fetch: () => new Response("ok") });
     const good: Subscriber = {

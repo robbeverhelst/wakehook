@@ -29,6 +29,13 @@
       "headers": { "Authorization": "Bearer your-openclaw-hooks-token" }
     },
     {
+      "id": "hermes",
+      "url": "http://localhost:8644/webhooks/wakehook",
+      "secret": "your-hermes-route-secret",
+      "signatureHeader": "X-Webhook-Signature",
+      "signatureFormat": "hex"
+    },
+    {
       "id": "example-generic",
       "url": "https://example.com/awake",
       "secret": "per-subscriber-hmac-secret"
