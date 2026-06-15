@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/robbeverhelst/wakehook/compare/v1.1.0...v1.2.0) (2026-06-15)
+
+
+### Features
+
+* **subscribers:** configurable signature header + combined OpenClaw/Hermes skill ([cb26ffb](https://github.com/robbeverhelst/wakehook/commit/cb26ffb4d28d4ca55dd7b0edb5c4dacd505ff3e0)), closes [#25](https://github.com/robbeverhelst/wakehook/issues/25)
+
 # [1.1.0](https://github.com/robbeverhelst/wakehook/compare/v1.0.0...v1.1.0) (2026-06-14)
 
 
