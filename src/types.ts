@@ -41,8 +41,19 @@ export interface Subscriber {
   id: string;
   /** Destination URL the WakeEvent is POSTed to. */
   url: string;
-  /** Optional HMAC secret; when set, the body is signed as `X-Wake-Signature`. */
+  /** Optional HMAC-SHA256 secret; when set, the body is signed (see signatureHeader). */
   secret?: string;
+  /**
+   * Header carrying the HMAC signature. Default `X-Wake-Signature`. Set it to
+   * match a receiver that verifies a specific header — e.g. Hermes Agent's
+   * `X-Hub-Signature-256` (GitHub-style) or `X-Webhook-Signature` (generic).
+   */
+  signatureHeader?: string;
+  /**
+   * How the signature is encoded: `prefixed` → `sha256=<hex>` (default, GitHub /
+   * X-Hub-Signature-256 style), `hex` → bare `<hex>` (Hermes X-Webhook-Signature).
+   */
+  signatureFormat?: "prefixed" | "hex";
   /**
    * Extra HTTP headers sent with every delivery — used to satisfy the receiver's
    * own auth. For OpenClaw, point `url` at a mapped hook and set
