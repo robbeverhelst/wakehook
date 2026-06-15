@@ -2,154 +2,83 @@
 
 # ⏰ wakehook
 
-**A webhook that fires when you wake up.**
+**A self-hosted webhook that fires when you wake up.**
 
-Plug in your sleep data, get a clean `user.awake` event — then make your morning *do something*.
-
-<img src="docs/architecture.svg" alt="wakehook — health APIs flow into wakehook, which infers the wake moment and fans a signed user.awake event out to OpenClaw, Home Assistant, or any URL" width="100%">
-
-<br>
+<img src="docs/architecture.svg" alt="wakehook: health APIs flow into wakehook, which infers the wake moment and fans a signed user.awake event out to OpenClaw, Home Assistant, or any URL" width="100%">
 
 [![npm](https://img.shields.io/npm/v/wakehook?logo=npm&color=cb3837)](https://www.npmjs.com/package/wakehook)
 [![ghcr](https://img.shields.io/badge/ghcr.io-wakehook-2496ED?logo=docker&logoColor=white)](https://github.com/robbeverhelst/wakehook/pkgs/container/wakehook)
-![runtime](https://img.shields.io/badge/built%20with-Bun-000000?logo=bun)
-![lang](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)
+![Bun](https://img.shields.io/badge/built%20with-Bun-000000?logo=bun)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178c6?logo=typescript&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-43b581)
-![providers](https://img.shields.io/badge/source-Google%20Health-4dd0e1)
 
 </div>
 
 ---
 
-## 🌅 The idea
+wakehook is a small self-hosted service that turns your sleep data (Google Health / Fitbit) into a
+signed `user.awake` webhook. It reads your sleep from the Google Health API, infers the moment you
+woke up, and POSTs a neutral event to whatever you point it at — an AI agent (OpenClaw, Hermes), a
+smart-home hub, or any URL. It fires at most once per morning.
 
-You wake up. Your Fitbit knows. So why does *nothing happen?*
+It is vendor-neutral by design: wakehook states a fact ("woke at 07:03") and signs it; each
+subscriber decides what to do with it. The core — inference, dedup, fan-out — knows nothing about
+any specific consumer.
 
-**wakehook** is the missing piece: a tiny, self-hosted service that watches your sleep data,
-figures out the moment you actually **woke up**, and **broadcasts a signed `user.awake` event**
-to anything you want — your AI agent, your smart home, a script, a webhook URL.
+## Why it exists
 
-It's deliberately **not built for any one tool.** [OpenClaw](https://docs.openclaw.ai) is just
-*one* subscriber, sitting next to Home Assistant, n8n, a smart lamp, or your own code.
+Google Health's own webhook can't drive an agent or smart home directly:
 
-> 🧠 wakehook states a **fact** — *"this person woke at 07:03"* — and broadcasts it.
-> Every subscriber decides its own **behavior**. The bus knows nothing about their purpose.
+- **Semantics** — it means "sleep data changed", and also fires for naps, mid-night syncs, and
+  edits. Something has to fetch the session and infer the actual wake.
+- **Payload** — Google sends `{operation, healthUserId, intervals}`; your consumer expects its own
+  shape.
+- **Handshake** — Google requires an ownership-verification challenge and a `204` ack with 7-day
+  retries that a typical consumer endpoint won't implement.
 
-📐 Full rationale & decision log in [`DESIGN.md`](./DESIGN.md).
+wakehook handles all three and emits one clean, signed event.
 
-## ☕ A morning, scripted
+## How it works
 
-```
-06:58  you stir, your Fitbit logs the end of sleep
-07:00  your phone syncs → Google Health → wakehook            "sleep data changed"
-07:00  wakehook: main sleep? ✓  ends this morning? ✓  not fired yet today? ✓  → FIRE
-07:00  ┌─ OpenClaw       → "morning! here's your day, weather's clear, 2 overnight msgs"
-       ├─ Home Assistant → bedroom lights fade up, coffee machine on
-       └─ your script    → logs wake time to a spreadsheet
-```
+wakehook fires on the first sleep session that is the **main** sleep, **ends today** inside a
+configurable **morning window**, is **long enough**, and **hasn't already fired today**. A later
+split-night session supersedes once, which heals Fitbit's occasional split logs. Thresholds are all
+configurable; the goal is to never miss a wake and to fire as soon as the data arrives.
 
-You didn't touch your phone. It just *happened.*
+Two ingestion modes:
 
-## 🤔 Why it has to exist
+- **poll** (default) — wakehook pulls the Google Health API on a timer, only around the morning
+  window, and stops once it has fired for the day. No inbound URL or open port; wake is detected
+  within one poll interval.
+- **webhook** (experimental) — Google pushes to wakehook's `/webhook`. Instant, but needs a public
+  HTTPS endpoint and is not yet verified end-to-end.
 
-You can't point Google Health's webhook straight at OpenClaw (or anything else):
+## ☕ Example
 
-| Blocker | What goes wrong |
-|---|---|
-| **Semantics** | Google's webhook means *"sleep data changed"* — it also fires for naps, mid-night syncs, and edits. It is **not** "you woke up." Something must fetch the session and *infer* the wake. |
-| **Payload** | Google speaks `{operation, healthUserId, intervals}`; your consumer speaks something else entirely. |
-| **Handshake** | Google demands an ownership-verification challenge and a `204` ack with 7-day retries. Your agent's endpoint won't play along. |
+Point wakehook at two subscribers and your morning runs itself. When it detects you woke at 07:03,
+it fires once and fans out:
 
-wakehook is the translator that closes that gap — **generically**, so *anything* can subscribe.
+- **OpenClaw** gets the nudge and runs your routine — checks the calendar and weather, summarizes
+  overnight messages, and sends you a briefing.
+- **Home Assistant** gets the signed event and turns on the bedroom lights and the coffee machine.
 
-## ⚙️ How it works
-
-```
-you wake → (phone syncs) → Google Health cloud ──POST──▶ /webhook
-   └─ ack 204 → fetch session → infer wake → dedup ──▶ fan out signed user.awake
-                                                         ├─▶ OpenClaw       → runs a workflow
-                                                         ├─▶ Home Assistant → lamp on
-                                                         └─▶ any URL        → its own behavior
-```
-
-The wake rule (every threshold configurable): fire when a session is the **main** sleep,
-**ends today** inside a **morning window**, is **long enough**, and we **haven't already fired
-today** — with a **supersede** re-fire to heal Fitbit's rare split-night logs.
-
-Tuned to two priorities:
-
-- 🛟 **Never miss a wakeup** — no freshness gate, so a late-syncing webhook still fires.
-- ⚡ **Fire as fast as the data arrives** — we act on the first qualifying signal, zero batching.
-
-> Latency floor is your phone syncing to the cloud (open the Fitbit app to force it instantly);
-> wakehook itself adds ~zero delay.
-
-## 📦 The event subscribers receive
-
-```http
-POST <subscriber-url>
-X-Wake-Signature: sha256=<hmac of body with the subscriber's secret>   # only if "secret" is set
-X-Wake-Event-Id: <user>:<wokeAt>
-
-{ "event": "user.awake", "wokeAt": "2026-06-14T07:03:00+02:00",
-  "user": "<healthUserId>", "source": "google-health",
-  "session": { "start": "...", "end": "...", "durationMin": 431 } }
-```
-
-Every subscriber gets exactly this — one **vendor-neutral** event. The bus does
-not format per-consumer; the consumer decides what it means. Per-subscriber knobs:
-
-- **`secret`** *(optional)* — when set, the body is HMAC-SHA256 signed so the
-  receiver can verify authenticity.
-- **`signatureHeader`** *(optional, default `X-Wake-Signature`)* — header the
-  signature rides in; **`signatureFormat`** is `prefixed` (`sha256=<hex>`, default)
-  or `hex` (bare). Set these to match a receiver's expected header.
-- **`headers`** *(optional)* — extra request headers to satisfy the receiver's
-  own auth, e.g. `{ "Authorization": "Bearer <token>" }`.
-
-**OpenClaw:** point `url` at a [mapped hook](https://docs.openclaw.ai/gateway/configuration-reference)
-(`/hooks/<name>`), pass the gateway's hook token via `headers`, and let OpenClaw
-turn the event into a wake/agent action with `hooks.mappings`. The
-[`SKILL.md`](./SKILL.md) walks an agent through it.
-
-**[Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/webhooks):**
-point `url` at a Hermes webhook route (`:8644/webhooks/<route>`), set `secret` to
-the route secret with `signatureHeader: "X-Webhook-Signature"`, `signatureFormat:
-"hex"`, and write the route's `prompt` template (`{wokeAt}`, `{session.durationMin}`).
-On loopback you can skip signing with Hermes's `INSECURE_NO_AUTH`.
-
-### 🤖 Install the skill into your agent
-
-[`SKILL.md`](./SKILL.md) (one skill, both agents) walks the agent through the
-whole setup — install, configure, authorize, run, and wire the hook. Add it with:
-
-```bash
-# OpenClaw
-openclaw skills install git:robbeverhelst/wakehook   # or: openclaw skills install wakehook (ClawHub)
-# Hermes Agent — zero-infra tap (reads the root SKILL.md)
-hermes skills tap add robbeverhelst/wakehook
-```
+No matter how many times your phone re-syncs that morning, it only fires once.
 
 ## 🚀 Quick start
 
-**Prerequisites:** [Bun](https://bun.sh) ≥ 1.3 (it's a Bun service — the npm package is
-**Bun-only**, it imports `bun:sqlite`), and a Google Cloud project with the **Health API**
-enabled, an **OAuth 2.0 client** (id + secret), and the `googlehealth.sleep.readonly` scope —
-see [Google setup notes](#-google-setup-notes).
+**Requirements:** [Bun](https://bun.sh) ≥ 1.3 (wakehook is Bun-only — it imports `bun:sqlite`), and
+a Google Cloud project with the Health API enabled, an OAuth 2.0 client (id + secret), and the
+`googlehealth.sleep.readonly` scope (see [Google setup](#google-setup)).
 
-The simplest path is **poll mode**: wakehook pulls sleep from the API on a timer, so all traffic
-is **outbound — no public URL or tunnel needed.** (Want *instant* fires? See
-[Webhook mode](#-webhook-mode-advanced).)
-
-**1 · Install**
+**1. Install**
 
 ```bash
-bunx wakehook                 # run without installing — or: bun add wakehook
+bunx wakehook                 # or: bun add wakehook
 # or Docker:
 docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook
 ```
 
-**2 · Configure** — create `config.json` in your working directory:
+**2. Configure** — create `config.json` in the working directory:
 
 ```json
 {
@@ -169,7 +98,7 @@ docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook
 }
 ```
 
-…and a `.env` with your OAuth credentials (keep these out of `config.json`):
+…and a `.env` with the OAuth credentials (keep secrets out of `config.json`):
 
 ```bash
 GOOGLE_CLIENT_ID=...
@@ -177,79 +106,105 @@ GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=http://localhost:8080/oauth/callback
 ```
 
-**3 · Authorize once** — opens a Google consent URL, then stores a refresh token in the sqlite
-DB (it auto-refreshes forever after):
+**3. Authorize once** — opens a Google consent URL, then stores a refresh token (auto-refreshed
+afterward):
 
 ```bash
 bunx wakehook-auth            # from source: bun run auth
 ```
 
-**4 · Run it** — it now polls Google every 15 min and fans a signed `user.awake` out to your
-subscribers, at most once per morning:
+**4. Run it** — polls Google around the morning window and fans the signed `user.awake` out to your
+subscribers, once per morning:
 
 ```bash
-bunx wakehook                 # from source: bun run start  (bun run dev to watch)
+bunx wakehook                 # from source: bun run start
 ```
 
-No inbound URL anywhere. By default (`pollWindowOnly`) it only polls around the
-morning window (`windowStart..windowEnd` ± `pollWindowMarginMin`) and stops once
-it has fired for the day — so a short `pollIntervalMs` (e.g. 2–5 min) gives a fast
-wake without hammering the API all day. Set `pollWindowOnly: false` to poll 24/7.
+A shorter `pollIntervalMs` (2–5 min) detects the wake faster; with `pollWindowOnly` it stays cheap.
+Set `pollWindowOnly: false` to poll 24/7.
 
-### 🧪 Test it without waiting for morning
+### Test without waiting for morning
 
 ```bash
 curl -X POST http://localhost:8080/test/replay \
-  -H "Authorization: Bearer $GOOGLE_WEBHOOK_AUTH_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{}'    # fires a synthetic wake "now"; pass {"end":"...","durationMin":420} to control it
+  -d '{}'    # fires a synthetic wake now; pass {"end":"...","durationMin":420} to control it
 ```
 
-### 📡 Webhook mode (advanced)
+### Webhook mode (experimental)
 
-For *instant* fires, Google Health can **push** to wakehook instead of being polled: set
-`"mode": "webhook"`, set `webhookAuthToken` (env `GOOGLE_WEBHOOK_AUTH_TOKEN` — the token Google
-must present), expose `/webhook` over public HTTPS (Cloudflare Tunnel / reverse proxy / VPS —
-wakehook makes **no ingress assumptions**), and register a Google Health **sleep** webhook
-subscription pointing at it.
+Set `"mode": "webhook"`, set `webhookAuthToken` (env `GOOGLE_WEBHOOK_AUTH_TOKEN`), expose
+`/webhook` over public HTTPS (Cloudflare Tunnel / reverse proxy / VPS — wakehook makes no ingress
+assumptions), and register a Google Health sleep webhook subscription pointing at it. The poll path
+is verified end-to-end; the webhook notification parsing and subscription-creation step are not yet
+verified — prefer poll unless you're ready to wire and test the push contract.
 
-> ⚠️ **Status:** the **poll** path is verified end-to-end against the live API. The webhook
-> *notification parsing* and the *subscription-creation* step are **not yet verified/implemented** —
-> stick with poll unless you're ready to wire and test the push contract yourself. `"both"` runs
-> poll with the webhook as an experimental safety net.
+## The event
 
-## 🔑 Google setup notes
+```http
+POST <subscriber-url>
+X-Wake-Signature: sha256=<hmac of body with the subscriber's secret>   # only if "secret" is set
+X-Wake-Event-Id: <user>:<wokeAt>
 
-- Create a Google Cloud project, enable the Health API, configure the OAuth consent screen,
-  add yourself as a test user. Scope: `googlehealth.sleep.readonly`.
-- **Publish the app to "In Production"** (still unverified, 100-user cap — fine for personal
-  use) so the refresh token doesn't expire after 7 days (the "Testing" default).
+{ "event": "user.awake", "wokeAt": "2026-06-14T07:03:00+02:00",
+  "user": "<healthUserId>", "source": "google-health",
+  "session": { "start": "...", "end": "...", "durationMin": 431 } }
+```
 
-## 🧩 Add your own provider
+Every subscriber receives the same neutral event. Per-subscriber options:
 
-Google Health is just the first `Source`. The core (inference, dedup, fan-out) is
-provider-agnostic, so a new provider touches **no core code**:
+- `secret` — when set, the body is HMAC-SHA256 signed so the receiver can verify it.
+- `signatureHeader` (default `X-Wake-Signature`) and `signatureFormat` (`prefixed` → `sha256=<hex>`,
+  or `hex` → bare) — set these to match a receiver's expected header.
+- `headers` — extra request headers for a receiver's own auth, e.g. `{ "Authorization": "Bearer <token>" }`.
 
-1. Implement the `Source` interface (`src/types.ts`) under `src/sources/<name>/`. A source
-   declares one or both **capabilities**:
-   - **`webhook`** (push) — the provider POSTs to `/webhook`
-     *(Google Health, Fitbit Web, WHOOP, Withings, Oura, Sleep as Android…)*.
-   - **`poll`** (pull) — wakehook polls it on a timer
-     *(on-device Health Connect bridge, Open Wearables, plain REST APIs…)*.
-2. Register it with **one line** in `src/sources/registry.ts`.
-3. Select it via `"source": "<name>"` in config.
+## 🤖 Connecting an agent
 
-The server mounts `/webhook` only for push sources; the scheduler drives poll sources. Google
-Health implements **both** (selectable via `google.mode`) — proof the interface carries either
-kind with no core changes.
+One [`SKILL.md`](./SKILL.md) walks an agent through the whole setup (install, configure, authorize,
+run, wire the hook) for both agents below:
 
-➕ **Receiver needs its own auth?** Set `headers` on the subscriber (e.g. a bearer token) — no code change.
+```bash
+# OpenClaw
+openclaw skills install git:robbeverhelst/wakehook   # or via ClawHub: openclaw skills install wakehook
+# Hermes Agent (zero-infra tap)
+hermes skills tap add robbeverhelst/wakehook
+```
 
-## 🛠️ Stack
+- **OpenClaw** — point `url` at a [mapped hook](https://docs.openclaw.ai/gateway/configuration-reference)
+  (`/hooks/<name>`), pass the gateway hook token via `headers`, and define a `hooks.mappings` entry
+  with `action: "wake"` + `textTemplate`.
+- **[Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/webhooks)** —
+  point `url` at a webhook route (`:8644/webhooks/<route>`), set `secret` to the route secret with
+  `signatureHeader: "X-Webhook-Signature"` and `signatureFormat: "hex"`, and give the route a
+  `prompt` template. On loopback you can skip signing with `INSECURE_NO_AUTH`.
 
-**Bun** · **Hono** · **`bun:sqlite`** — single portable service, shipped as a Docker image,
-12-factor config. Core logic is unit tested (`bun test`).
+## Google setup
 
-## 📄 License
+1. Create a Google Cloud project, enable the Health API, configure the OAuth consent screen, and add
+   yourself as a test user. Scope: `googlehealth.sleep.readonly`.
+2. Publish the app to **"In Production"** (still unverified, 100-user cap — fine for personal use) so
+   the refresh token doesn't expire after 7 days, which is the "Testing" default.
+
+## Adding a source
+
+Google Health is the first `Source`; the core is provider-agnostic, so a new provider touches no
+core code:
+
+1. Implement the `Source` interface (`src/types.ts`) under `src/sources/<name>/`. A source declares
+   a `webhook` capability (the provider POSTs to `/webhook`), a `poll` capability (wakehook polls it
+   on a timer), or both.
+2. Register it with one line in `src/sources/registry.ts`.
+3. Select it with `"source": "<name>"` in config.
+
+The server mounts `/webhook` only for push sources; the scheduler drives poll sources. Google Health
+implements both, selectable via `google.mode`.
+
+## Built with
+
+Bun, [Hono](https://hono.dev), and `bun:sqlite` — a single portable service, shipped as a Docker
+image, configured with a JSON file plus env vars. Core logic is unit tested (`bun test`). See
+[`DESIGN.md`](./DESIGN.md) for the rationale and decision log.
+
+## License
 
 MIT
