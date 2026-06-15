@@ -1,6 +1,6 @@
 <div align="center">
 
-# wakehook
+# ⏰ wakehook
 
 **A self-hosted webhook that fires when you wake up.**
 
@@ -53,7 +53,18 @@ Two ingestion modes:
 - **webhook** (experimental) — Google pushes to wakehook's `/webhook`. Instant, but needs a public
   HTTPS endpoint and is not yet verified end-to-end.
 
-## Quick start
+## ☕ Example
+
+Point wakehook at two subscribers and your morning runs itself. When it detects you woke at 07:03,
+it fires once and fans out:
+
+- **OpenClaw** gets the nudge and runs your routine — checks the calendar and weather, summarizes
+  overnight messages, and sends you a briefing.
+- **Home Assistant** gets the signed event and turns on the bedroom lights and the coffee machine.
+
+No matter how many times your phone re-syncs that morning, it only fires once.
+
+## 🚀 Quick start
 
 **Requirements:** [Bun](https://bun.sh) ≥ 1.3 (wakehook is Bun-only — it imports `bun:sqlite`), and
 a Google Cloud project with the Health API enabled, an OAuth 2.0 client (id + secret), and the
@@ -147,7 +158,7 @@ Every subscriber receives the same neutral event. Per-subscriber options:
   or `hex` → bare) — set these to match a receiver's expected header.
 - `headers` — extra request headers for a receiver's own auth, e.g. `{ "Authorization": "Bearer <token>" }`.
 
-## Connecting an agent
+## 🤖 Connecting an agent
 
 One [`SKILL.md`](./SKILL.md) walks an agent through the whole setup (install, configure, authorize,
 run, wire the hook) for both agents below:
