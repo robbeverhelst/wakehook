@@ -118,6 +118,18 @@ the route secret with `signatureHeader: "X-Webhook-Signature"`, `signatureFormat
 "hex"`, and write the route's `prompt` template (`{wokeAt}`, `{session.durationMin}`).
 On loopback you can skip signing with Hermes's `INSECURE_NO_AUTH`.
 
+### 🤖 Install the skill into your agent
+
+[`SKILL.md`](./SKILL.md) (one skill, both agents) walks the agent through the
+whole setup — install, configure, authorize, run, and wire the hook. Add it with:
+
+```bash
+# OpenClaw
+openclaw skills install git:robbeverhelst/wakehook   # or: openclaw skills install wakehook (ClawHub)
+# Hermes Agent — zero-infra tap (reads the root SKILL.md)
+hermes skills tap add robbeverhelst/wakehook
+```
+
 ## 🚀 Quick start
 
 **Prerequisites:** [Bun](https://bun.sh) ≥ 1.3 (it's a Bun service — the npm package is
