@@ -37,6 +37,19 @@ It's deliberately **not built for any one tool.** [OpenClaw](https://docs.opencl
 
 📐 Full rationale & decision log in [`DESIGN.md`](./DESIGN.md).
 
+## ☕ A morning, scripted
+
+```
+06:58  you stir, your Fitbit logs the end of sleep
+07:00  your phone syncs → Google Health → wakehook            "sleep data changed"
+07:00  wakehook: main sleep? ✓  ends this morning? ✓  not fired yet today? ✓  → FIRE
+07:00  ┌─ OpenClaw       → "morning! here's your day, weather's clear, 2 overnight msgs"
+       ├─ Home Assistant → bedroom lights fade up, coffee machine on
+       └─ your script    → logs wake time to a spreadsheet
+```
+
+You didn't touch your phone. It just *happened.*
+
 ## 🤔 Why it has to exist
 
 You can't point Google Health's webhook straight at OpenClaw (or anything else):
@@ -63,9 +76,13 @@ The wake rule (every threshold configurable): fire when a session is the **main*
 **ends today** inside a **morning window**, is **long enough**, and we **haven't already fired
 today** — with a **supersede** re-fire to heal Fitbit's rare split-night logs.
 
-Two priorities: **never miss a wakeup** (no freshness gate — a late sync still fires) and **fire
-as fast as the data arrives** (first qualifying signal, no batching). The only real latency is
-your phone syncing to the cloud — open the Fitbit app to force it.
+Tuned to two priorities:
+
+- 🛟 **Never miss a wakeup** — no freshness gate, so a late-syncing webhook still fires.
+- ⚡ **Fire as fast as the data arrives** — we act on the first qualifying signal, zero batching.
+
+> Latency floor is your phone syncing to the cloud (open the Fitbit app to force it instantly);
+> wakehook itself adds ~zero delay.
 
 ## 📦 The event subscribers receive
 
@@ -232,12 +249,6 @@ kind with no core changes.
 
 **Bun** · **Hono** · **`bun:sqlite`** — single portable service, shipped as a Docker image,
 12-factor config. Core logic is unit tested (`bun test`).
-
-## 📍 Status
-
-v1: Google Health source (**poll** verified end-to-end; webhook experimental), wake inference +
-dedup, and signed fan-out of one neutral `user.awake` event over a generic `Source` interface
-ready for more providers.
 
 ## 📄 License
 
