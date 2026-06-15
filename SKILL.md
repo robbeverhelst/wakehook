@@ -54,7 +54,9 @@ In the OpenClaw gateway config, enable hooks and add a mapping:
         action: "wake",
         wakeMode: "now",
         name: "wakehook",
-        messageTemplate: "You woke at {{wokeAt}} (slept {{session.durationMin}} min).",
+        // action "wake" builds its text from textTemplate (NOT messageTemplate —
+        // that's only for action "agent"; the wrong one returns HTTP 400):
+        textTemplate: "You woke at {{wokeAt}} (slept {{session.durationMin}} min).",
       },
     ],
   },
@@ -194,14 +196,14 @@ For OpenClaw the lever is the mapping; for Hermes it's the route `prompt` (and
 `deliver:`). OpenClaw mapping examples:
 
 **A — simple nudge, routine in the prompt** (`action: "wake"`): make
-`messageTemplate` the instruction the main session executes.
+`textTemplate` the instruction the main session executes.
 
 ```json5
 {
   match: { path: "wakehook" },
   action: "wake",
   wakeMode: "now",
-  messageTemplate: "Good morning — the user just woke ({{wokeAt}}). Run the morning routine: review today's calendar, summarize overnight messages, and give the weather.",
+  textTemplate: "Good morning — the user just woke ({{wokeAt}}). Run the morning routine: review today's calendar, summarize overnight messages, and give the weather.",
 }
 ```
 
@@ -264,6 +266,8 @@ the agent maps it and runs the routine.
 - **poll** needs the OAuth creds but **no inbound URL**; **webhook** is instant
   but unverified — prefer poll unless the user asks otherwise.
 - A Google **API key is not enough** — it needs the OAuth client + `wakehook-auth`.
+- **OpenClaw HTTP 400 `hook mapping requires text`** → an `action: "wake"` mapping
+  must use **`textTemplate`** (only `action: "agent"` uses `messageTemplate`).
 - If the hook returns 200 but nothing happens, check the OpenClaw version (a known
   issue affected some 2026.3.x builds) and that the mapping `action: "wake"` is set.
 
