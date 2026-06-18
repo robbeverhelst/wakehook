@@ -25,7 +25,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Validate SKILL.md
         run: |
           test -f SKILL.md
@@ -47,7 +47,7 @@ jobs:
             echo "Missing required secret: CLAWHUB_TOKEN" >&2
             exit 1
           fi
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
