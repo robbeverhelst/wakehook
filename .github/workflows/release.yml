@@ -31,7 +31,7 @@ jobs:
 
       # semantic-release is Node-native; run it on Node while the app stays Bun.
       # semantic-release v25 requires Node >=22.14.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       # OIDC trusted publishing needs npm >= 11.5.1 (runner ships 10.x).
