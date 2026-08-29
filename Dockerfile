@@ -1,4 +1,4 @@
-FROM oven/bun:1.3-slim
+FROM oven/bun:1.4-slim
 WORKDIR /app
 
 # Install deps first for layer caching.
