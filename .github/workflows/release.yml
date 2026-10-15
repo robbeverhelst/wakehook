@@ -26,8 +26,8 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
-      - run: bun install
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
 
       # semantic-release is Node-native; run it on Node while the app stays Bun.
       # semantic-release v25 requires Node >=22.14; @semantic-release/git v11 and

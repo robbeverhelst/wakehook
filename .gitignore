@@ -3,4 +3,3 @@ node_modules/
 *.sqlite-*
 .env
 config.json
-bun.lock*
