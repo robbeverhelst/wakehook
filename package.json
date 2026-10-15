@@ -50,7 +50,8 @@
     "start": "bun src/index.ts",
     "auth": "bun src/cli/auth.ts",
     "typecheck": "bun --bun tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "check:bun-native": "bun run scripts/check-bun-native.ts"
   },
   "dependencies": {
     "hono": "^4.6.14"
