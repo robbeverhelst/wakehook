@@ -18,6 +18,7 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      - run: bun run check:bun-native
       - run: bun run typecheck
       - run: bun test
 
