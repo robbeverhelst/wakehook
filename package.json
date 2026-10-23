@@ -4,7 +4,7 @@
   "description": "A self-hosted webhook that fires when you wake up. Your sleep data in, a signed user.awake event out.",
   "type": "module",
   "module": "src/index.ts",
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "license": "MIT",
   "author": "Robbe Verhelst",
   "homepage": "https://github.com/robbeverhelst/wakehook#readme",
