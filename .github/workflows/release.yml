@@ -34,7 +34,7 @@ jobs:
       # @semantic-release/changelog v7 require ^22.22.2 || >=24.15.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: 24
+          node-version: 26
       # OIDC trusted publishing needs npm >= 11.5.1 (runner ships 10.x).
       - run: npm install -g npm@latest
 
