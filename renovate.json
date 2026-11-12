@@ -7,5 +7,9 @@
   "lockFileMaintenance": {
     "enabled": true
   },
-  "osvVulnerabilityAlerts": true
+  "osvVulnerabilityAlerts": true,
+  "schedule": [
+    "after 1am and before 7am"
+  ],
+  "timezone": "Europe/Brussels"
 }
