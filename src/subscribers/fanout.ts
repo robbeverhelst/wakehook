@@ -83,7 +83,7 @@ export function toWakeEvent(
   return {
     event: "user.awake",
     kind,
-    ...(kind === "update" ? { update } : {}),
+    update,
     wokeAt: session.end,
     user: session.user,
     source,

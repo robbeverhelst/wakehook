@@ -27,9 +27,10 @@ export interface WakeEvent {
   /** "wake" for the first event of the morning; "update" when a later sync changed
    *  the numbers (longer session or completed stages). Receivers should say
    *  "update: you slept Xh" instead of starting the morning again. */
-  kind?: "wake" | "update";
-  /** 1, 2, … for update events. */
-  update?: number;
+  kind: "wake" | "update";
+  /** 0 on the first wake event, 1, 2, … for update events. Always present so
+   *  receiver templates ({kind}/{update}) resolve. */
+  update: number;
   /** Wake instant (ISO 8601 with offset) — equals session.end. */
   wokeAt: string;
   /** Opaque per-person id. */
