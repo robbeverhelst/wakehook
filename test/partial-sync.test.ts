@@ -150,3 +150,10 @@ describe("re-fire with corrected numbers", () => {
     expect(shouldPollNow(c, store, () => now)).toBe(false);
   });
 });
+
+test("wake events carry top-level kind and update: 0", async () => {
+  const { toWakeEvent } = await import("../src/subscribers/fanout");
+  const e = toWakeEvent({ user: "self", start: "a", end: "b", durationMin: 400 }, "google-health");
+  expect(e.kind).toBe("wake");
+  expect(e.update).toBe(0);
+});
