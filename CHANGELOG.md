@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/robbeverhelst/wakehook/compare/v1.2.0...v1.2.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* right sleep duration on partial Fitbit syncs, update events with corrected numbers ([#53](https://github.com/robbeverhelst/wakehook/issues/53)) ([c28eb76](https://github.com/robbeverhelst/wakehook/commit/c28eb76acac7957999ab14ba0c41aaaaa5cb0c57))
+
 # [1.2.0](https://github.com/robbeverhelst/wakehook/compare/v1.1.0...v1.2.0) (2026-06-15)
 
 
