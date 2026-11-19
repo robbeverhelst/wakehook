@@ -142,25 +142,52 @@ export class GoogleHealthSource implements Source {
  *     "sleep": { "interval": { "startTime": "...", "endTime": "..." },
  *                "type": "STAGES", "stages": [ … ] } }
  */
-function mapSession(raw: unknown, user: string): SleepSession | null {
+/** Below this share of the window covered by stages, the stage sum is a partial sync. */
+export const STAGE_COVERAGE = 0.9;
+
+export function mapSession(raw: unknown, user: string): SleepSession | null {
   const dp = raw as Record<string, any>;
   const iv = dp?.sleep?.interval;
   const start: string | undefined = iv?.startTime;
   const end: string | undefined = iv?.endTime;
   if (!start || !end) return null;
-  const durationMin = Math.round(
+  const inBedMin = Math.round(
     (new Date(end).getTime() - new Date(start).getTime()) / 60000,
   );
+  // durationMin = time actually asleep: the sum of the non-awake stages.
+  // The session window includes awake stretches (often 1.5-2 h), so using
+  // end - start overstated sleep. Falls back to the window when no stages.
+  // A Fitbit sync can land with only part of the stages (18 Nov: 3h49 of 9h06):
+  // when the stages cover < STAGE_COVERAGE of the window, the sum is a fraction
+  // of the night, so count the window minus the awake time we do know instead.
+  const AWAKE = new Set(["AWAKE", "OUT_OF_BED", "STAGE_TYPE_UNSPECIFIED"]);
+  const stages: any[] = Array.isArray(dp?.sleep?.stages) ? dp.sleep.stages : [];
+  let asleepMs = 0;
+  let awakeMs = 0;
+  for (const st of stages) {
+    if (!st?.startTime || !st?.endTime) continue;
+    const ms = new Date(st.endTime).getTime() - new Date(st.startTime).getTime();
+    if (AWAKE.has(String(st.type))) awakeMs += ms;
+    else asleepMs += ms;
+  }
+  const coverage = inBedMin > 0 ? (asleepMs + awakeMs) / 60000 / inBedMin : 0;
+  const durationMin =
+    stages.length === 0 || asleepMs === 0
+      ? inBedMin
+      : coverage >= STAGE_COVERAGE
+        ? Math.round(asleepMs / 60000)
+        : Math.max(0, inBedMin - Math.round(awakeMs / 60000));
   // The v4 sleep feed has no explicit main-vs-nap flag; treat a substantial
   // session as the main nightly sleep. The morning window + minDurationMin in
   // inference are the real guards against naps / split logs.
-  const isMainSleep = durationMin >= 180;
+  const isMainSleep = inBedMin >= 180;
   return {
     id: String(dp.name ?? `${user}:${start}`),
     user,
     start,
     end,
     durationMin,
+    inBedMin,
     isMainSleep,
   };
 }

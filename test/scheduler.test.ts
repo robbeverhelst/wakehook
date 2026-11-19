@@ -15,6 +15,8 @@ function cfg(overrides: Partial<Config["google"]> = {}): Config {
       windowEnd: "11:00",
       minDurationMin: 180,
       supersedeGapMin: 45,
+      correctionMin: 30,
+      maxUpdates: 3,
     },
     google: {
       clientId: "", clientSecret: "", redirectUri: "", webhookAuthToken: "", scopes: [],
@@ -47,11 +49,14 @@ describe("shouldPollNow (window gating)", () => {
     expect(shouldPollNow(cfg(), new Store(":memory:"), at("2026-06-14T01:20:00Z"))).toBe(false);
   });
 
-  test("stops after firing today, resumes next day", () => {
+  test("keeps polling after today's fire (late syncs), stops at the update cap, resumes next day", () => {
     const store = new Store(":memory:");
     store.upsertToken({ user: "u", access_token: "a", refresh_token: "r", expires_at: 0 });
-    store.setWakeState({ user: "u", fired_date: "2026-06-14", last_fired_end: "x" });
-    // in-window same day, already fired → skip
+    store.setWakeState({ user: "u", fired_date: "2026-06-14", last_fired_end: "x", updates: 0 });
+    // in-window same day, fired but no updates yet → keep polling for a corrected log
+    expect(shouldPollNow(cfg(), store, at("2026-06-14T05:00:00Z"))).toBe(true);
+    // update cap reached → skip
+    store.setWakeState({ user: "u", fired_date: "2026-06-14", last_fired_end: "x", updates: 3 });
     expect(shouldPollNow(cfg(), store, at("2026-06-14T05:00:00Z"))).toBe(false);
     // next day, in-window → poll again
     expect(shouldPollNow(cfg(), store, at("2026-06-15T05:00:00Z"))).toBe(true);

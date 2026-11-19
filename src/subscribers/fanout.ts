@@ -62,7 +62,7 @@ export async function fanout(
   store: Store,
   now: () => number = Date.now,
 ): Promise<{ delivered: number; failed: number }> {
-  const eventId = `${event.user}:${event.wokeAt}`;
+  const eventId = `${event.user}:${event.wokeAt}${event.update ? `:u${event.update}` : ""}`;
   if (subscribers.length === 0) {
     console.warn("[fanout] no subscribers configured — event not delivered anywhere");
     return { delivered: 0, failed: 0 };
@@ -75,11 +75,15 @@ export async function fanout(
 }
 
 export function toWakeEvent(
-  session: { user: string; start: string; end: string; durationMin: number },
+  session: { user: string; start: string; end: string; durationMin: number; inBedMin?: number },
   source: string,
+  kind: "wake" | "update" = "wake",
+  update = 0,
 ): WakeEvent {
   return {
     event: "user.awake",
+    kind,
+    ...(kind === "update" ? { update } : {}),
     wokeAt: session.end,
     user: session.user,
     source,
@@ -87,6 +91,7 @@ export function toWakeEvent(
       start: session.start,
       end: session.end,
       durationMin: session.durationMin,
+      ...(session.inBedMin !== undefined ? { inBedMin: session.inBedMin } : {}),
     },
   };
 }
