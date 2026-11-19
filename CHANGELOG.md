@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/robbeverhelst/wakehook/compare/v1.2.1...v1.3.0) (2026-11-19)
+
+
+### Features
+
+* always send top-level kind + update (0 on wake) so receiver templates resolve ([#54](https://github.com/robbeverhelst/wakehook/issues/54)) ([893dbc4](https://github.com/robbeverhelst/wakehook/commit/893dbc413f7e04d5d12bee6a21ee4f3a7d007593))
+
 ## [1.2.1](https://github.com/robbeverhelst/wakehook/compare/v1.2.0...v1.2.1) (2026-11-19)
 
 
