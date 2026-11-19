@@ -27,11 +27,14 @@ export function shouldPollNow(cfg: Config, store: Store, now: () => number): boo
   const end = hhmmToMinutes(windowEnd) + margin;
   if (local.minutes < start || local.minutes > end) return false; // outside window
 
-  // Single-user poll: once the sole user has fired today, stop until tomorrow.
+  // Single-user poll: after today's fire keep polling for the rest of the morning
+  // window, so a late or partial Fitbit sync can still update the numbers
+  // (19 Nov: the poll stopped at a 04:19 fire on a partial log, and the real
+  // 06:57 wake synced later). Stops once the update cap is reached.
   const token = store.getSoleToken();
   if (token) {
     const state = store.getWakeState(token.user);
-    if (state && state.fired_date === local.date) return false;
+    if (state && state.fired_date === local.date && (state.updates ?? 0) >= cfg.inference.maxUpdates) return false;
   }
   return true;
 }

@@ -45,6 +45,14 @@ configurable **morning window**, is **long enough**, and **hasn't already fired 
 split-night session supersedes once, which heals Fitbit's occasional split logs. Thresholds are all
 configurable; the goal is to never miss a wake and to fire as soon as the data arrives.
 
+**Update events.** Fitbit often syncs a night in parts: at the first fire the log can end early or carry only
+some of its sleep stages. wakehook keeps polling for the rest of the morning window after it fires. When a
+later log ends more than `supersedeGapMin` after the one it fired on, or the asleep minutes move by at least
+`correctionMin`, it sends the event again with `"kind": "update"` and `"update": 1, 2, …` (at most
+`maxUpdates` a morning). Receivers should treat an update as "the numbers changed", not as a new wake. When the
+stages cover less than 90% of the in-bed window, `durationMin` is the window minus the awake time that is
+known, instead of the sum of the partial stages.
+
 Two ingestion modes:
 
 - **poll** (default) — wakehook pulls the Google Health API on a timer, only around the morning
@@ -89,7 +97,9 @@ docker run -v wakehook-data:/data --env-file .env ghcr.io/robbeverhelst/wakehook
     "windowStart": "04:00",
     "windowEnd": "11:00",
     "minDurationMin": 180,
-    "supersedeGapMin": 45
+    "supersedeGapMin": 45,
+    "correctionMin": 30,
+    "maxUpdates": 3
   },
   "google": { "mode": "poll", "pollIntervalMs": 300000, "pollLookbackMin": 720, "pollWindowOnly": true, "pollWindowMarginMin": 30 },
   "subscribers": [
@@ -148,6 +158,7 @@ X-Wake-Event-Id: <user>:<wokeAt>
 
 { "event": "user.awake", "wokeAt": "2026-06-14T07:03:00+02:00",
   "user": "<healthUserId>", "source": "google-health",
+  "kind": "wake",
   "session": { "start": "...", "end": "...", "durationMin": 431 } }
 ```
 

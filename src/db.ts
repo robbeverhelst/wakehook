@@ -15,6 +15,8 @@ export interface WakeStateRow {
   user: string;
   fired_date: string; // local YYYY-MM-DD
   last_fired_end: string; // ISO of the session end we last fired on
+  last_fired_duration?: number | null; // asleep minutes we last reported
+  updates?: number | null; // update events sent this morning
 }
 
 export class Store {
@@ -48,6 +50,14 @@ export class Store {
         PRIMARY KEY (event_id, subscriber)
       );
     `);
+    // Added 19 Nov (update events): older databases get the columns on start.
+    for (const col of ["last_fired_duration INTEGER", "updates INTEGER NOT NULL DEFAULT 0"]) {
+      try {
+        this.db.exec(`ALTER TABLE wake_state ADD COLUMN ${col}`);
+      } catch {
+        // already there
+      }
+    }
   }
 
   // --- tokens -------------------------------------------------------------
@@ -89,12 +99,18 @@ export class Store {
   setWakeState(row: WakeStateRow): void {
     this.db
       .query(
-        `INSERT INTO wake_state (user, fired_date, last_fired_end)
-         VALUES ($user, $date, $end)
+        `INSERT INTO wake_state (user, fired_date, last_fired_end, last_fired_duration, updates)
+         VALUES ($user, $date, $end, $dur, $upd)
          ON CONFLICT(user) DO UPDATE SET
-           fired_date = $date, last_fired_end = $end`,
+           fired_date = $date, last_fired_end = $end, last_fired_duration = $dur, updates = $upd`,
       )
-      .run({ $user: row.user, $date: row.fired_date, $end: row.last_fired_end });
+      .run({
+        $user: row.user,
+        $date: row.fired_date,
+        $end: row.last_fired_end,
+        $dur: row.last_fired_duration ?? null,
+        $upd: row.updates ?? 0,
+      });
   }
 
   // --- delivery tracking --------------------------------------------------

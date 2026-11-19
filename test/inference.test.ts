@@ -10,6 +10,10 @@ const cfg: InferenceConfig = {
   windowEnd: "11:00",
   minDurationMin: 180,
   supersedeGapMin: 45,
+  correctionMin: 30,
+  maxUpdates: 3,
+      correctionMin: 30,
+      maxUpdates: 3,
 };
 
 // In June, Brussels is UTC+2. 07:03 local == 05:03Z.

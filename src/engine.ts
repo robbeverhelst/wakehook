@@ -18,7 +18,10 @@ export class Engine {
   /** Process sessions from a source. Returns how many wake events were fired. */
   async process(sessions: SleepSession[], source: string): Promise<number> {
     let fired = 0;
-    for (const session of sessions) {
+    // Latest-ending first: one poll can return the partial and the full log of
+    // the same night; the full one should win, the stale one then skips.
+    const ordered = [...sessions].sort((a, b) => Date.parse(b.end) - Date.parse(a.end));
+    for (const session of ordered) {
       const nowIso = new Date(this.now()).toISOString();
       const prior = this.store.getWakeState(session.user);
       const decision = decide(session, this.cfg.inference, prior, nowIso);
@@ -29,13 +32,16 @@ export class Engine {
       }
 
       console.log(`[engine] FIRE ${session.id}: ${decision.reason}`);
+      const updates = decision.kind === "update" ? (prior?.updates ?? 0) + 1 : 0;
       this.store.setWakeState({
         user: session.user,
         fired_date: decision.firedDate,
         last_fired_end: session.end,
+        last_fired_duration: session.durationMin,
+        updates,
       });
 
-      const event = toWakeEvent(session, source);
+      const event = toWakeEvent(session, source, decision.kind, updates);
       const res = await fanout(event, this.cfg.subscribers, this.store, this.now);
       console.log(`[engine] delivered ${res.delivered}/${res.delivered + res.failed} subscribers`);
       fired++;

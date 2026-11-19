@@ -13,8 +13,10 @@ export interface SleepSession {
   start: string;
   /** End / wake instant (ISO 8601 with offset). */
   end: string;
-  /** Duration in minutes. */
+  /** Minutes actually asleep (non-awake stages; the window length when the provider gives no stages). */
   durationMin: number;
+  /** Minutes from session start to end, awake stretches included. */
+  inBedMin?: number;
   /** True for the main nightly sleep; false for naps. */
   isMainSleep: boolean;
 }
@@ -22,6 +24,12 @@ export interface SleepSession {
 /** The neutral fact this bus exists to broadcast. */
 export interface WakeEvent {
   event: "user.awake";
+  /** "wake" for the first event of the morning; "update" when a later sync changed
+   *  the numbers (longer session or completed stages). Receivers should say
+   *  "update: you slept Xh" instead of starting the morning again. */
+  kind?: "wake" | "update";
+  /** 1, 2, … for update events. */
+  update?: number;
   /** Wake instant (ISO 8601 with offset) — equals session.end. */
   wokeAt: string;
   /** Opaque per-person id. */
@@ -32,6 +40,7 @@ export interface WakeEvent {
     start: string;
     end: string;
     durationMin: number;
+    inBedMin?: number;
   };
 }
 

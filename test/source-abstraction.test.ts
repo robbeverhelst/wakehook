@@ -19,6 +19,8 @@ function cfg(): Config {
       windowEnd: "11:00",
       minDurationMin: 180,
       supersedeGapMin: 45,
+      correctionMin: 30,
+      maxUpdates: 3,
     },
     google: {
       clientId: "",

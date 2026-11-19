@@ -17,7 +17,7 @@ import type { WakeStateRow } from "../db.ts";
 import { hhmmToMinutes, localParts } from "./time.ts";
 
 export type Decision =
-  | { fire: true; firedDate: string; reason: string }
+  | { fire: true; firedDate: string; reason: string; kind: "wake" | "update" }
   | { fire: false; reason: string };
 
 export function decide(
@@ -53,8 +53,12 @@ export function decide(
     };
   }
 
-  // Dedup + supersede.
+  // Dedup, supersede and corrections. The first fire stays fast; a later poll that
+  // shows a longer session (19 Nov: end +158m) or a completed stage sync (18 Nov:
+  // 3h49 -> 9h06) re-fires once per change as an update with the right numbers.
   if (prior && prior.fired_date === today) {
+    const updates = prior.updates ?? 0;
+    if (updates >= cfg.maxUpdates) return { fire: false, reason: "already fired today (update cap)" };
     const gapMs =
       new Date(session.end).getTime() - new Date(prior.last_fired_end).getTime();
     const gapMin = gapMs / 60000;
@@ -62,13 +66,23 @@ export function decide(
       return {
         fire: true,
         firedDate: today,
+        kind: "update",
         reason: `supersede: ends ${Math.round(gapMin)}m after prior fire`,
+      };
+    }
+    const prev = prior.last_fired_duration;
+    if (gapMin >= -cfg.supersedeGapMin && prev != null && Math.abs(session.durationMin - prev) >= cfg.correctionMin) {
+      return {
+        fire: true,
+        firedDate: today,
+        kind: "update",
+        reason: `correction: asleep ${prev}m -> ${session.durationMin}m`,
       };
     }
     return { fire: false, reason: "already fired today" };
   }
 
-  return { fire: true, firedDate: today, reason: "first qualifying main sleep today" };
+  return { fire: true, firedDate: today, kind: "wake", reason: "first qualifying main sleep today" };
 }
 
 function fmtMin(m: number): string {

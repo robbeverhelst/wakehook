@@ -17,6 +17,11 @@ export interface InferenceConfig {
   /** If a later main-sleep ends > this many minutes after one we already fired
    *  on, re-fire once (heals Fitbit split-night logs). */
   supersedeGapMin: number;
+  /** Re-fire as an update when the same night's asleep minutes move by at least this much
+   *  (a partial Fitbit sync completing later). */
+  correctionMin: number;
+  /** At most this many update events per morning. */
+  maxUpdates: number;
 }
 
 export type GoogleMode = "webhook" | "poll" | "both";
@@ -71,6 +76,8 @@ const DEFAULTS = {
     windowEnd: "11:00",
     minDurationMin: 180,
     supersedeGapMin: 45,
+    correctionMin: 30,
+    maxUpdates: 3,
   } satisfies InferenceConfig,
 };
 
